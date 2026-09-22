@@ -8,9 +8,11 @@ import vertexai
 from vertexai.preview import reasoning_engines
 from src.app import SlideAgentApp
 from src.config import GCP_PROJECT_ID
+from src.services.auth_service import get_google_credentials
 
 # Configurações do Deploy
 DEPLOY_LOCATION = "us-central1"  # Região padrão dos agentes na Agent Platform
+STAGING_BUCKET = "gs://geo-gemini-artifacts-presales"  # Bucket de staging em us-central1
 DISPLAY_NAME = "Gerador de Apresentações Geoambiente"
 DESCRIPTION = "Agente corporativo para criação automática de apresentações e propostas no Google Slides via Gemini 3.7 Flash."
 
@@ -25,14 +27,18 @@ REQUIREMENTS = [
 
 def deploy():
     print("=== [INICIANDO DEPLOY NO VERTEX AI AGENT RUNTIME] ===")
-    print(f"Projeto: {GCP_PROJECT_ID}")
-    print(f"Região: {DEPLOY_LOCATION}")
+    print(f"Projeto:        {GCP_PROJECT_ID}")
+    print(f"Região:         {DEPLOY_LOCATION}")
+    print(f"Staging Bucket: {STAGING_BUCKET}")
     print(f"Nome do Agente: {DISPLAY_NAME}")
 
-    # Inicializa o SDK do Vertex AI
+    # Inicializa o SDK do Vertex AI com o bucket de staging
+    creds = get_google_credentials()
     vertexai.init(
         project=GCP_PROJECT_ID,
-        location=DEPLOY_LOCATION
+        location=DEPLOY_LOCATION,
+        staging_bucket=STAGING_BUCKET,
+        credentials=creds
     )
 
     app = SlideAgentApp()
