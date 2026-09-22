@@ -16,13 +16,16 @@ STAGING_BUCKET = "gs://geo-gemini-artifacts-presales"  # Bucket de staging em us
 DISPLAY_NAME = "Gerador de Apresentações Geoambiente"
 DESCRIPTION = "Agente corporativo para criação automática de apresentações e propostas no Google Slides via Gemini 3.7 Flash."
 
-# Dependências que o runtime do Vertex AI instalará no container gerenciado
+# Dependências completas para o container gerenciado do Vertex AI Agent Runtime
 REQUIREMENTS = [
     "google-genai>=2.0.0",
     "google-api-python-client>=2.0.0",
     "google-auth>=2.0.0",
+    "google-auth-oauthlib>=1.0.0",
+    "google-auth-httplib2>=0.2.0",
     "pydantic>=2.0.0",
-    "python-dotenv>=1.0.0"
+    "python-dotenv>=1.0.0",
+    "cloudpickle>=3.0.0"
 ]
 
 def deploy():
