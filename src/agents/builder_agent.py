@@ -1,10 +1,9 @@
-"""
-Agente 2 / Tool: Slide Master Builder (Motor Determinístico de Slides)
-Responsável por clonar a matriz oficial e montar a apresentação no Google Slides API.
+﻿"""
+Agente 2: Slide Master Builder (Automação Determinística via Drive & Slides API)
 """
 
 import logging
-from typing import Dict, Any
+from typing import Optional
 from src.models.presentation_spec import PresentationSpec
 from src.services.drive_service import DriveService
 from src.services.slides_service import SlidesService
@@ -12,36 +11,29 @@ from src.services.slides_service import SlidesService
 logger = logging.getLogger(__name__)
 
 class BuilderAgent:
-    def __init__(self, drive_service: DriveService = None, slides_service: SlidesService = None):
-        self.drive_service = drive_service or DriveService()
-        self.slides_service = slides_service or SlidesService()
+    def __init__(self, drive_service: Optional[DriveService] = None, slides_service: Optional[SlidesService] = None, user_token: Optional[str] = None):
+        self.drive_service = drive_service or DriveService(user_token=user_token)
+        self.slides_service = slides_service or SlidesService(user_token=user_token)
 
-    def build_presentation(self, spec: PresentationSpec) -> Dict[str, Any]:
+    def build_presentation(self, spec: PresentationSpec) -> str:
         """
-        Executa a montagem determinística dos slides a partir do schema validado.
+        Executa a montagem completa da apresentação:
+        1. Clona a apresentação matriz oficial para o Drive do usuário.
+        2. Atualiza a capa, sumário e slides institucionais.
+        3. Insere os slides de conteúdo com cards, cores e tipografia oficiais.
+        4. Retorna a URL final da apresentação editável.
         """
-        file_name = f"{spec.title} - {spec.client}" if spec.client else spec.title
+        file_name = f"{spec.title} - {spec.client_name}"
         logger.info(f"Agente 2 (Builder) iniciando construção de '{file_name}'...")
 
-        # 1. Clonar apresentação matriz oficial para o Drive
+        # 1. Clonar Template Matriz
         presentation_id = self.drive_service.clone_matrix_template(title=file_name)
 
-        # 2. Aplicar especificações de Capa, Boas-vindas, Cartões e Encerramento
-        presentation_url = self.slides_service.apply_presentation_spec(
+        # 2. Aplicar especificações visuais e de conteúdo
+        final_url = self.slides_service.apply_presentation_spec(
             presentation_id=presentation_id,
             spec=spec
         )
 
-        # 3. Compartilhar com o domínio se aplicável
-        self.drive_service.share_with_domain(file_id=presentation_id, role="writer")
-
-        result = {
-            "presentation_id": presentation_id,
-            "url": presentation_url,
-            "title": spec.title,
-            "client": spec.client,
-            "total_content_slides": len(spec.slides) + (1 if spec.welcome_slide else 0)
-        }
-
-        logger.info(f"Agente 2 concluiu a montagem com sucesso! URL: {presentation_url}")
-        return result
+        logger.info(f"Agente 2 concluiu a montagem com sucesso! URL: {final_url}")
+        return final_url

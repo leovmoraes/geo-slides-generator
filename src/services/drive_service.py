@@ -1,4 +1,4 @@
-"""
+﻿"""
 Serviço de Operações no Google Drive
 """
 
@@ -10,13 +10,12 @@ from src.services.auth_service import get_drive_service
 logger = logging.getLogger(__name__)
 
 class DriveService:
-    def __init__(self, drive_client=None):
-        self.client = drive_client or get_drive_service()
+    def __init__(self, drive_client=None, user_token: Optional[str] = None):
+        self.client = drive_client or get_drive_service(user_token=user_token)
 
     def clone_matrix_template(self, title: str, folder_id: Optional[str] = "root") -> str:
         """
         Clona a apresentação matriz oficial para o Drive do usuário.
-        Por padrão grava na raiz 'root' (Meu Drive) para evitar problemas de permissão em diretórios somente leitura.
         """
         logger.info(f"Clonando template matriz {TEMPLATE_PRESENTATION_ID} como '{title}'...")
 

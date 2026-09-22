@@ -1,49 +1,55 @@
-"""
-Orquestrador do Workflow Multi-Agente ADK
-Gerencia o fluxo sequencial: Briefing -> Agente 1 (Planner) -> Schema -> Agente 2 (Builder) -> URL
+﻿"""
+Orquestrador do Workflow Multi-Agente
+Coordena a passagem de bastão entre o Agente 1 (Planner) e o Agente 2 (Builder).
 """
 
 import time
 import logging
-from typing import Dict, Any, Optional
-from src.models.presentation_spec import PresentationSpec
+from typing import Optional
+from dataclasses import dataclass
 from src.agents.planner_agent import PlannerAgent
 from src.agents.builder_agent import BuilderAgent
 
 logger = logging.getLogger(__name__)
 
-class SlideMasterWorkflow:
-    def __init__(self, planner_agent: Optional[PlannerAgent] = None, builder_agent: Optional[BuilderAgent] = None):
-        self.planner = planner_agent or PlannerAgent()
-        self.builder = builder_agent or BuilderAgent()
+@dataclass
+class WorkflowResult:
+    presentation_url: str
+    presentation_id: str
+    title: str
+    client_name: str
+    slide_count: int
+    execution_time_seconds: float
 
-    def run(self, prompt: str) -> Dict[str, Any]:
-        """
-        Executa o workflow completo de ponta a ponta.
-        """
+class SlideMasterWorkflow:
+    def __init__(self, planner: Optional[PlannerAgent] = None, builder: Optional[BuilderAgent] = None, user_token: Optional[str] = None):
+        self.planner = planner or PlannerAgent()
+        self.builder = builder or BuilderAgent(user_token=user_token)
+
+    def run(self, user_prompt: str, user_token: Optional[str] = None) -> WorkflowResult:
         start_time = time.time()
         logger.info(f"=== [INICIANDO WORKFLOW MULTI-AGENTE ADK] ===")
-        logger.info(f"Prompt do Usuário: '{prompt}'")
+        logger.info(f"Prompt do Usuário: '{user_prompt}'")
 
-        # ETAPA 1: Agente 1 gera o conteúdo e estrutura em formato Pydantic
+        # 1. Agente 1: Planeja o conteúdo e a estrutura visual
         logger.info("--> [ETAPA 1/2]: Executando Agente 1 (Content & Design Planner)...")
-        spec: PresentationSpec = self.planner.plan_presentation(prompt)
+        spec = self.planner.plan_presentation(user_prompt)
 
-        # ETAPA 2: Agente 2 clona a matriz oficial e renderiza os slides determinísticos
+        # 2. Agente 2: Constrói os slides determinísticos clonando a matriz oficial
         logger.info("--> [ETAPA 2/2]: Executando Agente 2 (Slide Master Builder)...")
-        build_result = self.builder.build_presentation(spec)
+        builder = BuilderAgent(user_token=user_token) if user_token else self.builder
+        presentation_url = builder.build_presentation(spec)
 
-        elapsed = round(time.time() - start_time, 2)
-        logger.info(f"=== [WORKFLOW CONCLUÍDO EM {elapsed}s] ===")
+        # 3. Extrai presentation_id da URL
+        presentation_id = presentation_url.split("/d/")[1].split("/edit")[0]
+        elapsed = time.time() - start_time
 
-        return {
-            "status": "success",
-            "message": "Apresentação corporativa gerada com sucesso seguindo 100% o padrão Geoambiente!",
-            "presentation_id": build_result["presentation_id"],
-            "url": build_result["url"],
-            "title": build_result["title"],
-            "client": build_result["client"],
-            "total_content_slides": build_result["total_content_slides"],
-            "spec": spec.model_dump(),
-            "elapsed_seconds": elapsed
-        }
+        logger.info(f"=== [WORKFLOW CONCLUÍDO EM {elapsed:.2f}s] ===")
+        return WorkflowResult(
+            presentation_url=presentation_url,
+            presentation_id=presentation_id,
+            title=spec.title,
+            client_name=spec.client_name,
+            slide_count=len(spec.slides) + 1,
+            execution_time_seconds=elapsed
+        )

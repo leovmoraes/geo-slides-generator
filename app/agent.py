@@ -1,5 +1,6 @@
 ﻿"""
 Agente oficial do ADK para geração de apresentações corporativas Geoambiente & Google Cloud.
+Suporta autenticação delegada do Usuário Final via OAuth do Gemini Enterprise.
 """
 
 import logging
@@ -23,19 +24,39 @@ def _get_workflow() -> SlideMasterWorkflow:
         _workflow = SlideMasterWorkflow()
     return _workflow
 
-def generate_slides_presentation(prompt: str) -> str:
+def generate_slides_presentation(prompt: str, tool_context=None) -> str:
     """
     Gera uma apresentação corporativa completa e editável no Google Slides seguindo a identidade visual oficial da Geoambiente e Google Cloud.
     
     Args:
         prompt: Briefing da apresentação, tema, cliente, pilares estratégicos e escopo desejado.
+        tool_context: Contexto do ADK contendo a autenticação delegada do usuário final.
         
     Returns:
         Uma mensagem formatada com o título, cliente e o link editável do Google Slides pronto.
     """
     logger.info(f"Tool generate_slides_presentation chamada com prompt: {prompt}")
+    
+    # 1. Extração do Token OAuth do Usuário Final (se fornecido pelo Gemini Enterprise)
+    user_token = None
+    if tool_context:
+        try:
+            if hasattr(tool_context, "get_credential") and tool_context.get_credential():
+                cred = tool_context.get_credential()
+                if isinstance(cred, dict):
+                    user_token = cred.get("token") or cred.get("access_token")
+                elif isinstance(cred, str):
+                    user_token = cred
+            elif hasattr(tool_context, "get_auth_response") and tool_context.get_auth_response():
+                auth_resp = tool_context.get_auth_response()
+                if isinstance(auth_resp, dict):
+                    user_token = auth_resp.get("access_token") or auth_resp.get("token")
+        except Exception as e:
+            logger.debug(f"Aviso ao extrair credencial do tool_context: {e}")
+
+    # 2. Execução do Workflow
     workflow = _get_workflow()
-    result = workflow.run(prompt)
+    result = workflow.run(prompt, user_token=user_token)
     
     return (
         f"### ✅ Apresentação gerada com sucesso no padrão oficial Geoambiente!\n\n"
