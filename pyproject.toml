@@ -1,4 +1,4 @@
-﻿[project]
+[project]
 name = "slides-agent"
 version = "0.1.0"
 description = "Gerador de Apresentações Corporativas Geoambiente no Google Slides"
