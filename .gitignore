@@ -1,0 +1,29 @@
+# Python & Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Google OAuth & Secrets (CRÍTICO: Nunca commitar!)
+credentials.json
+token.json
+*secret*.json
+*.key.json
+service_account*.json
+
+# Ambientes Locais
+.env
+.env.local
+
+# IDEs & OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
