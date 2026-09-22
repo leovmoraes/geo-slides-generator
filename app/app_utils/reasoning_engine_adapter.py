@@ -1,4 +1,4 @@
-# Copyright 2026 Google LLC
+﻿# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,30 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Serve the reasoning_engine ``{class_method, input}`` contract over HTTP.
-
-Exists to guarantee support for the Vertex AI Console Playground and Gemini
-Enterprise (via ADK registration), which both invoke the engine through this
-contract. Agent Engine forwards calls to ``/api/reasoning_engine`` (sync) and
-``/api/stream_reasoning_engine`` (streaming); dispatch is limited to the
-:class:`AdkApp` ``register_operations()`` methods so the wire output matches a
-packaged Agent Engine.
-"""
+"""Serve the reasoning_engine contract over HTTP."""
 
 import inspect
 import json
+import logging
 
 from agentplatform.agent_engines.templates.adk import AdkApp
 from fastapi import FastAPI, HTTPException, Request, encoders, responses
 from starlette.concurrency import iterate_in_threadpool, run_in_threadpool
 
 from app.app_utils import services
+from src.services.auth_service import set_request_user_token
 
+logger = logging.getLogger(__name__)
 
 def _no_op_instrumentor_builder(project_id: str) -> None:
-    """No-op so set_up() keeps the startup instrumentor and generate_content spans."""
     return None
 
+def _extract_token_from_request(request: Request) -> None:
+    """Extrai token OAuth delegado do usuário a partir dos cabeçalhos da requisição."""
+    auth_header = (
+        request.headers.get("authorization") or
+        request.headers.get("x-goog-user-token") or
+        request.headers.get("x-forwarded-authorization") or
+        request.headers.get("x-serverless-authorization")
+    )
+    if auth_header:
+        token = auth_header
+        if token.lower().startswith("bearer "):
+            token = token[7:].strip()
+        logger.info("Token de usuário detectado e injetado no contexto da requisição.")
+        set_request_user_token(token)
+    else:
+        set_request_user_token(None)
 
 def attach_reasoning_engine_routes(app: FastAPI) -> None:
     """Register reasoning_engine routes that dispatch to an AdkApp."""
@@ -48,8 +58,6 @@ def attach_reasoning_engine_routes(app: FastAPI) -> None:
         if runtime is None:
             from app.agent import app as adk_app
 
-            # Reuse the process-wide services so sessions created here are
-            # visible to the adk_api and A2A paths, and vice versa (see services.py).
             runtime = AdkApp(
                 app=adk_app,
                 session_service_builder=services.get_session_service,
@@ -78,6 +86,7 @@ def attach_reasoning_engine_routes(app: FastAPI) -> None:
 
     @app.post("/api/stream_reasoning_engine")
     async def stream_query(request: Request) -> responses.StreamingResponse:
+        _extract_token_from_request(request)
         body = await request.json()
         method = resolve_method(body["class_method"], streaming=True)
         kwargs = body.get("input") or {}
@@ -101,6 +110,7 @@ def attach_reasoning_engine_routes(app: FastAPI) -> None:
 
     @app.post("/api/reasoning_engine")
     async def query(request: Request) -> responses.JSONResponse:
+        _extract_token_from_request(request)
         body = await request.json()
         method = resolve_method(body["class_method"], streaming=False)
         kwargs = body.get("input") or {}

@@ -27,6 +27,7 @@ class SlidesService:
     def apply_presentation_spec(self, presentation_id: str, spec: PresentationSpec) -> str:
         """
         Executa as alterações estruturadas na apresentação clonada via batchUpdate.
+        Suporta tanto templates existentes quanto apresentações criadas do zero.
         """
         logger.info(f"Aplicando especificação de slides na apresentação {presentation_id}...")
 
@@ -36,27 +37,42 @@ class SlidesService:
 
         slides = presentation.get("slides", [])
         num_slides = len(slides)
-        logger.info(f"Apresentação matriz possui {num_slides} slides iniciais.")
+        logger.info(f"Apresentação possui {num_slides} slides iniciais.")
 
         requests = []
 
-        # 1. Atualizar Capa (Slide 1)
-        if num_slides > 0:
+        if num_slides > 1:
+            # Caso 1: Template Matriz clonado com sucesso
             cover_slide_id = slides[0]["objectId"]
             requests.extend(self._build_cover_requests(cover_slide_id, spec))
 
-        # 2. Atualizar Slide 2 (Boas-vindas / Contexto) se existir
-        if num_slides > 1 and spec.welcome_slide:
-            welcome_slide_id = slides[1]["objectId"]
-            requests.extend(self._build_welcome_requests(welcome_slide_id, spec))
+            if spec.welcome_slide:
+                welcome_slide_id = slides[1]["objectId"]
+                requests.extend(self._build_welcome_requests(welcome_slide_id, spec))
 
-        # 3. Criar Slides de Conteúdo baseados em Cards
-        for idx, slide_spec in enumerate(spec.slides):
-            insert_index = 2 + idx
-            slide_id = f"content_slide_{idx+1}"
-            requests.extend(self._build_content_slide_requests(slide_id, insert_index, slide_spec))
+            for idx, slide_spec in enumerate(spec.slides):
+                insert_index = 2 + idx
+                slide_id = f"content_slide_{idx+1}"
+                requests.extend(self._build_content_slide_requests(slide_id, insert_index, slide_spec))
+        else:
+            # Caso 2: Apresentação criada do zero (Construção completa de Capa, Boas-vindas e Conteúdo)
+            cover_id = "slide_cover_custom"
+            requests.extend(self._build_fresh_cover_requests(cover_id, 0, spec))
 
-        # 4. Executar tudo em um único lote atômico (batchUpdate)
+            welcome_id = "slide_welcome_custom"
+            requests.extend(self._build_fresh_welcome_requests(welcome_id, 1, spec))
+
+            for idx, slide_spec in enumerate(spec.slides):
+                insert_index = 2 + idx
+                slide_id = f"content_slide_{idx+1}"
+                requests.extend(self._build_content_slide_requests(slide_id, insert_index, slide_spec))
+
+            # Remove o slide em branco default inicial se houver
+            if num_slides == 1:
+                initial_blank_id = slides[0]["objectId"]
+                requests.append({"deleteObject": {"objectId": initial_blank_id}})
+
+        # Executa tudo em lote atômico
         logger.info(f"Executando batchUpdate com {len(requests)} operações...")
         body = {"requests": requests}
         self.client.presentations().batchUpdate(
@@ -70,7 +86,7 @@ class SlidesService:
 
     def _build_cover_requests(self, slide_id: str, spec: PresentationSpec) -> List[Dict[str, Any]]:
         client_name = getattr(spec, "client_name", None) or getattr(spec, "client", "") or ""
-        requests = [
+        return [
             {
                 "replaceAllText": {
                     "containsText": {"text": "{{TITULO}}", "matchCase": False},
@@ -93,7 +109,6 @@ class SlidesService:
                 }
             }
         ]
-        return requests
 
     def _build_welcome_requests(self, slide_id: str, spec: PresentationSpec) -> List[Dict[str, Any]]:
         welcome = spec.welcome_slide
@@ -108,11 +123,140 @@ class SlidesService:
             }
         ]
 
+    def _build_fresh_cover_requests(self, slide_id: str, insert_idx: int, spec: PresentationSpec) -> List[Dict[str, Any]]:
+        """Constrói uma Capa oficial elegante no padrão visual Geoambiente."""
+        client_name = getattr(spec, "client_name", None) or getattr(spec, "client", "") or "Cliente Corporativo"
+        requests = [
+            {"createSlide": {"objectId": slide_id, "insertionIndex": insert_idx, "slideLayoutReference": {"predefinedLayout": "BLANK"}}},
+            # Barra Decorativa Laranja
+            {
+                "createShape": {
+                    "objectId": f"{slide_id}_bar",
+                    "shapeType": "RECTANGLE",
+                    "elementProperties": {
+                        "pageObjectId": slide_id,
+                        "size": {"width": {"magnitude": 12 * EMU_PER_PT, "unit": "EMU"}, "height": {"magnitude": 405 * EMU_PER_PT, "unit": "EMU"}},
+                        "transform": {"scaleX": 1, "scaleY": 1, "translateX": 0, "translateY": 0, "unit": "EMU"}
+                    }
+                }
+            },
+            {
+                "updateShapeProperties": {
+                    "objectId": f"{slide_id}_bar",
+                    "shapeProperties": {
+                        "shapeBackgroundFill": {"solidFill": {"color": {"rgbColor": COLOR_PRIMARY_ORANGE}}},
+                        "outline": {"propertyState": "NOT_RENDERED"}
+                    },
+                    "fields": "shapeBackgroundFill.solidFill.color,outline.propertyState"
+                }
+            },
+            # Tag Institucional
+            {
+                "createShape": {
+                    "objectId": f"{slide_id}_tag",
+                    "shapeType": "TEXT_BOX",
+                    "elementProperties": {
+                        "pageObjectId": slide_id,
+                        "size": {"width": {"magnitude": 600 * EMU_PER_PT, "unit": "EMU"}, "height": {"magnitude": 30 * EMU_PER_PT, "unit": "EMU"}},
+                        "transform": {"scaleX": 1, "scaleY": 1, "translateX": 50 * EMU_PER_PT, "translateY": 50 * EMU_PER_PT, "unit": "EMU"}
+                    }
+                }
+            },
+            {"insertText": {"objectId": f"{slide_id}_tag", "text": "GEOAMBIENTE & GOOGLE CLOUD | PROPOSTA EXECUTIVA", "insertionIndex": 0}},
+            {"updateTextStyle": {"objectId": f"{slide_id}_tag", "style": {"fontFamily": FONT_TITLE, "fontSize": {"magnitude": 12, "unit": "PT"}, "bold": True, "foregroundColor": {"opaqueColor": {"rgbColor": COLOR_PRIMARY_ORANGE}}}, "fields": "fontFamily,fontSize,bold,foregroundColor"}},
+            # Título Principal
+            {
+                "createShape": {
+                    "objectId": f"{slide_id}_title",
+                    "shapeType": "TEXT_BOX",
+                    "elementProperties": {
+                        "pageObjectId": slide_id,
+                        "size": {"width": {"magnitude": 620 * EMU_PER_PT, "unit": "EMU"}, "height": {"magnitude": 100 * EMU_PER_PT, "unit": "EMU"}},
+                        "transform": {"scaleX": 1, "scaleY": 1, "translateX": 50 * EMU_PER_PT, "translateY": 90 * EMU_PER_PT, "unit": "EMU"}
+                    }
+                }
+            },
+            {"insertText": {"objectId": f"{slide_id}_title", "text": spec.title, "insertionIndex": 0}},
+            {"updateTextStyle": {"objectId": f"{slide_id}_title", "style": {"fontFamily": FONT_TITLE, "fontSize": {"magnitude": 28, "unit": "PT"}, "bold": True, "foregroundColor": {"opaqueColor": {"rgbColor": COLOR_PRIMARY_BLUE}}}, "fields": "fontFamily,fontSize,bold,foregroundColor"}},
+            # Subtítulo e Cliente
+            {
+                "createShape": {
+                    "objectId": f"{slide_id}_sub",
+                    "shapeType": "TEXT_BOX",
+                    "elementProperties": {
+                        "pageObjectId": slide_id,
+                        "size": {"width": {"magnitude": 620 * EMU_PER_PT, "unit": "EMU"}, "height": {"magnitude": 80 * EMU_PER_PT, "unit": "EMU"}},
+                        "transform": {"scaleX": 1, "scaleY": 1, "translateX": 50 * EMU_PER_PT, "translateY": 210 * EMU_PER_PT, "unit": "EMU"}
+                    }
+                }
+            },
+            {"insertText": {"objectId": f"{slide_id}_sub", "text": f"{spec.subtitle}\nPreparado para: {client_name}\nData: {spec.date or '2026'}", "insertionIndex": 0}},
+            {"updateTextStyle": {"objectId": f"{slide_id}_sub", "style": {"fontFamily": FONT_BODY, "fontSize": {"magnitude": 14, "unit": "PT"}, "foregroundColor": {"opaqueColor": {"rgbColor": COLOR_TEXT_DARK}}}, "fields": "fontFamily,fontSize,foregroundColor"}}
+        ]
+        return requests
+
+    def _build_fresh_welcome_requests(self, slide_id: str, insert_idx: int, spec: PresentationSpec) -> List[Dict[str, Any]]:
+        """Constrói o Slide de Boas-vindas e Objetivos Estratégicos."""
+        welcome = spec.welcome_slide
+        obj_text = getattr(welcome, "objective", None) or getattr(welcome, "title", None) or "Modernização, eficiência e transformação digital corporativa."
+        requests = [
+            {"createSlide": {"objectId": slide_id, "insertionIndex": insert_idx, "slideLayoutReference": {"predefinedLayout": "BLANK"}}},
+            # Cabeçalho
+            {
+                "createShape": {
+                    "objectId": f"{slide_id}_head",
+                    "shapeType": "TEXT_BOX",
+                    "elementProperties": {
+                        "pageObjectId": slide_id,
+                        "size": {"width": {"magnitude": 650 * EMU_PER_PT, "unit": "EMU"}, "height": {"magnitude": 60 * EMU_PER_PT, "unit": "EMU"}},
+                        "transform": {"scaleX": 1, "scaleY": 1, "translateX": 30 * EMU_PER_PT, "translateY": 30 * EMU_PER_PT, "unit": "EMU"}
+                    }
+                }
+            },
+            {"insertText": {"objectId": f"{slide_id}_head", "text": "OBJETIVO ESTRATÉGICO\nVisão Geral e Contexto da Solução", "insertionIndex": 0}},
+            {"updateTextStyle": {"objectId": f"{slide_id}_head", "style": {"fontFamily": FONT_TITLE, "fontSize": {"magnitude": 20, "unit": "PT"}, "bold": True, "foregroundColor": {"opaqueColor": {"rgbColor": COLOR_PRIMARY_BLUE}}}, "fields": "fontFamily,fontSize,bold,foregroundColor"}},
+            # Caixa de Destaque
+            {
+                "createShape": {
+                    "objectId": f"{slide_id}_box",
+                    "shapeType": "ROUND_RECTANGLE",
+                    "elementProperties": {
+                        "pageObjectId": slide_id,
+                        "size": {"width": {"magnitude": 660 * EMU_PER_PT, "unit": "EMU"}, "height": {"magnitude": 250 * EMU_PER_PT, "unit": "EMU"}},
+                        "transform": {"scaleX": 1, "scaleY": 1, "translateX": 30 * EMU_PER_PT, "translateY": 110 * EMU_PER_PT, "unit": "EMU"}
+                    }
+                }
+            },
+            {
+                "updateShapeProperties": {
+                    "objectId": f"{slide_id}_box",
+                    "shapeProperties": {
+                        "shapeBackgroundFill": {"solidFill": {"color": {"rgbColor": COLOR_BG_CARD}}},
+                        "outline": {"outlineFill": {"solidFill": {"color": {"rgbColor": COLOR_BORDER_CARD}}}, "weight": {"magnitude": 1, "unit": "PT"}}
+                    },
+                    "fields": "shapeBackgroundFill.solidFill.color,outline.outlineFill.solidFill.color,outline.weight"
+                }
+            },
+            {
+                "createShape": {
+                    "objectId": f"{slide_id}_box_text",
+                    "shapeType": "TEXT_BOX",
+                    "elementProperties": {
+                        "pageObjectId": slide_id,
+                        "size": {"width": {"magnitude": 620 * EMU_PER_PT, "unit": "EMU"}, "height": {"magnitude": 210 * EMU_PER_PT, "unit": "EMU"}},
+                        "transform": {"scaleX": 1, "scaleY": 1, "translateX": 50 * EMU_PER_PT, "translateY": 130 * EMU_PER_PT, "unit": "EMU"}
+                    }
+                }
+            },
+            {"insertText": {"objectId": f"{slide_id}_box_text", "text": f"🎯 Propósito da Proposta:\n\n{obj_text}\n\n• Parceria estratégica com governança e suporte especializado Geoambiente.\n• Implementação acelerada utilizando as melhores práticas do Google Cloud Platform.", "insertionIndex": 0}},
+            {"updateTextStyle": {"objectId": f"{slide_id}_box_text", "style": {"fontFamily": FONT_BODY, "fontSize": {"magnitude": 12, "unit": "PT"}, "foregroundColor": {"opaqueColor": {"rgbColor": COLOR_TEXT_DARK}}}, "fields": "fontFamily,fontSize,foregroundColor"}}
+        ]
+        return requests
+
     def _build_content_slide_requests(self, slide_id: str, insertion_index: int, slide_spec: SlideSpec) -> List[Dict[str, Any]]:
         requests = []
         section_cat = getattr(slide_spec, "section_title", None) or getattr(slide_spec, "section_category", "VISÃO GERAL")
 
-        # 1. Slide em branco
         requests.append({
             "createSlide": {
                 "objectId": slide_id,
@@ -121,7 +265,6 @@ class SlidesService:
             }
         })
 
-        # 2. Seção Cabeçalho
         category_box_id = f"{slide_id}_cat"
         requests.extend([
             {
@@ -135,28 +278,10 @@ class SlidesService:
                     }
                 }
             },
-            {
-                "insertText": {
-                    "objectId": category_box_id,
-                    "text": section_cat.upper(),
-                    "insertionIndex": 0
-                }
-            },
-            {
-                "updateTextStyle": {
-                    "objectId": category_box_id,
-                    "style": {
-                        "fontFamily": FONT_TITLE,
-                        "fontSize": {"magnitude": 12, "unit": "PT"},
-                        "bold": True,
-                        "foregroundColor": {"opaqueColor": {"rgbColor": COLOR_PRIMARY_ORANGE}}
-                    },
-                    "fields": "fontFamily,fontSize,bold,foregroundColor"
-                }
-            }
+            {"insertText": {"objectId": category_box_id, "text": section_cat.upper(), "insertionIndex": 0}},
+            {"updateTextStyle": {"objectId": category_box_id, "style": {"fontFamily": FONT_TITLE, "fontSize": {"magnitude": 12, "unit": "PT"}, "bold": True, "foregroundColor": {"opaqueColor": {"rgbColor": COLOR_PRIMARY_ORANGE}}}, "fields": "fontFamily,fontSize,bold,foregroundColor"}}
         ])
 
-        # 3. Título do Slide
         title_box_id = f"{slide_id}_title"
         requests.extend([
             {
@@ -170,28 +295,10 @@ class SlidesService:
                     }
                 }
             },
-            {
-                "insertText": {
-                    "objectId": title_box_id,
-                    "text": slide_spec.title,
-                    "insertionIndex": 0
-                }
-            },
-            {
-                "updateTextStyle": {
-                    "objectId": title_box_id,
-                    "style": {
-                        "fontFamily": FONT_TITLE,
-                        "fontSize": {"magnitude": 20, "unit": "PT"},
-                        "bold": True,
-                        "foregroundColor": {"opaqueColor": {"rgbColor": COLOR_PRIMARY_BLUE}}
-                    },
-                    "fields": "fontFamily,fontSize,bold,foregroundColor"
-                }
-            }
+            {"insertText": {"objectId": title_box_id, "text": slide_spec.title, "insertionIndex": 0}},
+            {"updateTextStyle": {"objectId": title_box_id, "style": {"fontFamily": FONT_TITLE, "fontSize": {"magnitude": 20, "unit": "PT"}, "bold": True, "foregroundColor": {"opaqueColor": {"rgbColor": COLOR_PRIMARY_BLUE}}}, "fields": "fontFamily,fontSize,bold,foregroundColor"}}
         ])
 
-        # 4. Inserção dos Cartões (Cards)
         cards = slide_spec.cards
         num_cards = min(len(cards), 4)
         if num_cards == 0:
@@ -226,10 +333,7 @@ class SlidesService:
                         "objectId": card_shape_id,
                         "shapeProperties": {
                             "shapeBackgroundFill": {"solidFill": {"color": {"rgbColor": COLOR_BG_CARD}}},
-                            "outline": {
-                                "outlineFill": {"solidFill": {"color": {"rgbColor": COLOR_BORDER_CARD}}},
-                                "weight": {"magnitude": 1, "unit": "PT"}
-                            }
+                            "outline": {"outlineFill": {"solidFill": {"color": {"rgbColor": COLOR_BORDER_CARD}}}, "weight": {"magnitude": 1, "unit": "PT"}}
                         },
                         "fields": "shapeBackgroundFill.solidFill.color,outline.outlineFill.solidFill.color,outline.weight"
                     }
@@ -252,24 +356,8 @@ class SlidesService:
                         }
                     }
                 },
-                {
-                    "insertText": {
-                        "objectId": card_text_id,
-                        "text": full_card_text,
-                        "insertionIndex": 0
-                    }
-                },
-                {
-                    "updateTextStyle": {
-                        "objectId": card_text_id,
-                        "style": {
-                            "fontFamily": FONT_BODY,
-                            "fontSize": {"magnitude": 10.5, "unit": "PT"},
-                            "foregroundColor": {"opaqueColor": {"rgbColor": COLOR_TEXT_DARK}}
-                        },
-                        "fields": "fontFamily,fontSize,foregroundColor"
-                    }
-                }
+                {"insertText": {"objectId": card_text_id, "text": full_card_text, "insertionIndex": 0}},
+                {"updateTextStyle": {"objectId": card_text_id, "style": {"fontFamily": FONT_BODY, "fontSize": {"magnitude": 10.5, "unit": "PT"}, "foregroundColor": {"opaqueColor": {"rgbColor": COLOR_TEXT_DARK}}}, "fields": "fontFamily,fontSize,foregroundColor"}}
             ])
 
         return requests

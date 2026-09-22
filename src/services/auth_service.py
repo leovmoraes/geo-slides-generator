@@ -1,11 +1,12 @@
 ﻿"""
 Serviço de Autenticação com Google Workspace e GCP
-Suporta OAuth2 do Usuário Final (Token de delegação do Gemini Enterprise),
+Suporta OAuth2 do Usuário Final (Token de delegação repassado via cabeçalho HTTP/ADK),
 OAuth2 do Projeto (credentials.json/token.json), Service Account e ADC.
 """
 
 import os
 import logging
+import contextvars
 from typing import Optional
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -25,18 +26,25 @@ SCOPES = [
 TOKEN_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "token.json")
 CREDENTIALS_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "credentials.json")
 
+# ContextVar para propagar o token de autorização da requisição do Gemini Enterprise
+_request_user_token: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("request_user_token", default=None)
+
+def set_request_user_token(token: Optional[str]):
+    """Define o token do usuário autenticado no contexto da requisição atual."""
+    _request_user_token.set(token)
+
 def get_google_credentials(user_token: Optional[str] = None):
     """
     Obtém credenciais válidas:
-    1. Token de acesso OAuth do Usuário Final (repassado pelo Gemini Enterprise via OIDC/OAuth)
+    1. Token de acesso OAuth do Usuário Final (repassado pelo Gemini Enterprise)
     2. token.json / credentials.json (OAuth interno da Geoambiente)
     3. Service Account Key File (GOOGLE_APPLICATION_CREDENTIALS)
     4. Application Default Credentials (ADC)
     """
-    # 1. Se recebemos o token OAuth do usuário final (Gemini Enterprise)
-    if user_token:
+    token = user_token or _request_user_token.get()
+    if token:
         logger.info("Utilizando credencial OAuth delegada do usuário final...")
-        return Credentials(token=user_token, scopes=SCOPES)
+        return Credentials(token=token, scopes=SCOPES)
 
     creds = None
 
@@ -48,24 +56,13 @@ def get_google_credentials(user_token: Optional[str] = None):
                 return creds
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
-                with open(TOKEN_PATH, "w") as token:
-                    token.write(creds.to_json())
+                with open(TOKEN_PATH, "w") as token_file:
+                    token_file.write(creds.to_json())
                 return creds
         except Exception as e:
             logger.debug(f"Erro ao carregar token.json: {e}")
 
-    # 3. Se houver credentials.json (OAuth do projeto geo-gemini-enterprise), executar fluxo
-    if os.path.exists(CREDENTIALS_PATH):
-        try:
-            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
-            creds = flow.run_local_server(port=0)
-            with open(TOKEN_PATH, "w") as token:
-                token.write(creds.to_json())
-            return creds
-        except Exception as oauth_err:
-            logger.debug(f"OAuth local não executado em ambiente sem display: {oauth_err}")
-
-    # 4. Tentar Service Account Key
+    # 3. Tentar Service Account Key
     service_account_file = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     if service_account_file and os.path.exists(service_account_file):
         logger.info(f"Carregando credenciais de Service Account: {service_account_file}")
@@ -73,7 +70,7 @@ def get_google_credentials(user_token: Optional[str] = None):
             service_account_file, scopes=SCOPES
         )
 
-    # 5. Tentar ADC
+    # 4. Tentar ADC
     try:
         creds, _ = google.auth.default(scopes=SCOPES)
         return creds
