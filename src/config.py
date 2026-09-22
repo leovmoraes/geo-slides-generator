@@ -1,4 +1,4 @@
-"""
+﻿"""
 Configurações e Design System Corporativo Geoambiente & Google Cloud
 """
 
@@ -47,6 +47,17 @@ FONTS = {
     "TITLE": "Poppins",
     "BODY": "Inter"
 }
+
+# Constantes de conveniência para montagem visual
+COLOR_PRIMARY_ORANGE = COLORS["ORANGE_GEO"]
+COLOR_PRIMARY_BLUE = COLORS["BLUE_GCP"]
+COLOR_BG_CARD = COLORS["CARD_BG"]
+COLOR_BORDER_CARD = COLORS["CARD_BORDER"]
+COLOR_TEXT_DARK = COLORS["TEXT_PRIMARY"]
+COLOR_TEXT_MUTED = COLORS["TEXT_SECONDARY"]
+FONT_TITLE = FONTS["TITLE"]
+FONT_BODY = FONTS["BODY"]
+EMU_PER_PT = 12700
 
 # Dimensões Padrão de Slides 16:9 (em Pontos - PT)
 SLIDE_LAYOUT = {

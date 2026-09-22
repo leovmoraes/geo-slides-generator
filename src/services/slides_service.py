@@ -30,7 +30,6 @@ class SlidesService:
         """
         logger.info(f"Aplicando especificação de slides na apresentação {presentation_id}...")
 
-        # 1. Obter metadados da apresentação para mapear slides existentes
         presentation = self.client.presentations().get(
             presentationId=presentation_id
         ).execute()
@@ -41,23 +40,23 @@ class SlidesService:
 
         requests = []
 
-        # 2. Atualizar Capa (Slide 1)
+        # 1. Atualizar Capa (Slide 1)
         if num_slides > 0:
             cover_slide_id = slides[0]["objectId"]
             requests.extend(self._build_cover_requests(cover_slide_id, spec))
 
-        # 3. Atualizar Slide 2 (Boas-vindas / Contexto) se existir
-        if num_slides > 1:
+        # 2. Atualizar Slide 2 (Boas-vindas / Contexto) se existir
+        if num_slides > 1 and spec.welcome_slide:
             welcome_slide_id = slides[1]["objectId"]
             requests.extend(self._build_welcome_requests(welcome_slide_id, spec))
 
-        # 4. Criar Slides de Conteúdo baseados em Cards
+        # 3. Criar Slides de Conteúdo baseados em Cards
         for idx, slide_spec in enumerate(spec.slides):
             insert_index = 2 + idx
             slide_id = f"content_slide_{idx+1}"
             requests.extend(self._build_content_slide_requests(slide_id, insert_index, slide_spec))
 
-        # 5. Executar tudo em um único lote atômico (batchUpdate)
+        # 4. Executar tudo em um único lote atômico (batchUpdate)
         logger.info(f"Executando batchUpdate com {len(requests)} operações...")
         body = {"requests": requests}
         self.client.presentations().batchUpdate(
@@ -70,7 +69,7 @@ class SlidesService:
         return url
 
     def _build_cover_requests(self, slide_id: str, spec: PresentationSpec) -> List[Dict[str, Any]]:
-        """Substitui textos da capa pelos dados do briefing"""
+        client_name = getattr(spec, "client_name", None) or getattr(spec, "client", "") or ""
         requests = [
             {
                 "replaceAllText": {
@@ -89,7 +88,7 @@ class SlidesService:
             {
                 "replaceAllText": {
                     "containsText": {"text": "{{CLIENTE}}", "matchCase": False},
-                    "replaceText": spec.client_name,
+                    "replaceText": client_name,
                     "pageObjectIds": [slide_id]
                 }
             }
@@ -97,24 +96,23 @@ class SlidesService:
         return requests
 
     def _build_welcome_requests(self, slide_id: str, spec: PresentationSpec) -> List[Dict[str, Any]]:
-        """Atualiza o slide de boas-vindas / objetivo"""
+        welcome = spec.welcome_slide
+        obj_text = getattr(welcome, "objective", None) or getattr(welcome, "title", "Objetivo Estratégico")
         return [
             {
                 "replaceAllText": {
                     "containsText": {"text": "{{OBJETIVO}}", "matchCase": False},
-                    "replaceText": spec.welcome_slide.objective,
+                    "replaceText": obj_text,
                     "pageObjectIds": [slide_id]
                 }
             }
         ]
 
     def _build_content_slide_requests(self, slide_id: str, insertion_index: int, slide_spec: SlideSpec) -> List[Dict[str, Any]]:
-        """
-        Gera requisições para criar um slide limpo com cartões brancos, bordas cinzas e tipografia corporativa.
-        """
         requests = []
+        section_cat = getattr(slide_spec, "section_title", None) or getattr(slide_spec, "section_category", "VISÃO GERAL")
 
-        # 1. Criação do Slide com fundo padrão
+        # 1. Slide em branco
         requests.append({
             "createSlide": {
                 "objectId": slide_id,
@@ -123,7 +121,7 @@ class SlidesService:
             }
         })
 
-        # 2. Inserção do Cabeçalho de Categoria / Seção (Caixa Alta, Laranja Geoambiente)
+        # 2. Seção Cabeçalho
         category_box_id = f"{slide_id}_cat"
         requests.extend([
             {
@@ -140,7 +138,7 @@ class SlidesService:
             {
                 "insertText": {
                     "objectId": category_box_id,
-                    "text": slide_spec.section_category.upper(),
+                    "text": section_cat.upper(),
                     "insertionIndex": 0
                 }
             },
@@ -158,7 +156,7 @@ class SlidesService:
             }
         ])
 
-        # 3. Inserção do Título do Slide (Poppins, Azul Google Cloud)
+        # 3. Título do Slide
         title_box_id = f"{slide_id}_title"
         requests.extend([
             {
@@ -199,7 +197,6 @@ class SlidesService:
         if num_cards == 0:
             return requests
 
-        # Cálculo de Grid Dinâmico
         slide_width_pt = 720
         margin_left_pt = 30
         gap_pt = 15
@@ -212,7 +209,6 @@ class SlidesService:
             card_x_pt = margin_left_pt + (card_idx * (card_width_pt + gap_pt))
             card_shape_id = f"{slide_id}_card_{card_idx}"
 
-            # 4.1. Fundo do Card (Retângulo Arredondado Branco com Borda Sutil)
             requests.extend([
                 {
                     "createShape": {
@@ -240,9 +236,9 @@ class SlidesService:
                 }
             ])
 
-            # 4.2. Conteúdo Interno do Card (Tag + Título + Bullet points)
             card_text_id = f"{slide_id}_cardtext_{card_idx}"
-            full_card_text = f"[{card.tag}]\n{card.title}\n\n" + "\n".join([f"• {b}" for b in card.bullets])
+            bullet_list = getattr(card, "points", None) or getattr(card, "bullets", [])
+            full_card_text = f"[{card.tag}]\n{card.title}\n\n" + "\n".join([f"• {b}" for b in bullet_list])
 
             requests.extend([
                 {

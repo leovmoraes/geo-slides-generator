@@ -1,4 +1,4 @@
-"""
+﻿"""
 Modelos Pydantic para Estruturação Estrita das Apresentações Geoambiente
 """
 
@@ -20,7 +20,11 @@ class CardSpec(BaseModel):
         ...,
         min_length=1,
         max_length=5,
-        description="Lista de 2 a 4 tópicos explicativos com fontes Inter/Roboto (#5F6368)"
+        description="Lista de 2 a 4 tópicos explicativos"
+    )
+    bullets: Optional[List[str]] = Field(
+        default=None,
+        description="Alias opcional para tópicos explicativos"
     )
 
 
@@ -29,6 +33,10 @@ class SlideSpec(BaseModel):
     section_title: str = Field(
         default="VISÃO GERAL",
         description="Categoria ou nome da seção em caixa alta no cabeçalho (#F58120)"
+    )
+    section_category: Optional[str] = Field(
+        default=None,
+        description="Alias opcional para categoria de seção"
     )
     title: str = Field(
         ...,
@@ -39,6 +47,18 @@ class SlideSpec(BaseModel):
         min_length=1,
         max_length=4,
         description="Lista de 1 a 4 cartões de conteúdo para o slide"
+    )
+
+
+class WelcomeSlideSpec(BaseModel):
+    """Slide de boas-vindas / contexto inicial"""
+    objective: str = Field(
+        default="Apresentar soluções estratégicas corporativas",
+        description="Objetivo principal da apresentação"
+    )
+    agenda_items: List[str] = Field(
+        default_factory=list,
+        description="Tópicos da agenda"
     )
 
 
@@ -55,6 +75,10 @@ class PresentationSpec(BaseModel):
     client: Optional[str] = Field(
         default=None,
         description="Nome do cliente ou parceiro de negócios"
+    )
+    client_name: Optional[str] = Field(
+        default=None,
+        description="Alias opcional para nome do cliente"
     )
     author: str = Field(
         default="Equipe Especialista Geoambiente",

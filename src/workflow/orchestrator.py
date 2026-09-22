@@ -40,8 +40,9 @@ class SlideMasterWorkflow:
         builder = BuilderAgent(user_token=user_token) if user_token else self.builder
         presentation_url = builder.build_presentation(spec)
 
-        # 3. Extrai presentation_id da URL
+        # 3. Extrai presentation_id da URL e dados de saída
         presentation_id = presentation_url.split("/d/")[1].split("/edit")[0]
+        resolved_client = getattr(spec, "client_name", None) or getattr(spec, "client", None) or "Cliente Corporativo"
         elapsed = time.time() - start_time
 
         logger.info(f"=== [WORKFLOW CONCLUÍDO EM {elapsed:.2f}s] ===")
@@ -49,7 +50,7 @@ class SlideMasterWorkflow:
             presentation_url=presentation_url,
             presentation_id=presentation_id,
             title=spec.title,
-            client_name=spec.client_name,
+            client_name=resolved_client,
             slide_count=len(spec.slides) + 1,
             execution_time_seconds=elapsed
         )
