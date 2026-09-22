@@ -1,23 +1,24 @@
 ﻿"""
-Script de Deploy para o Vertex AI Agent Runtime (Deployments on Agent Runtime).
-Publica o agente diretamente no projeto geo-gemini-enterprise.
+Script de Deploy oficial para o Vertex AI Agent Runtime usando Google ADK.
+Publica o agente oficial diretamente no projeto geo-gemini-enterprise.
 """
 
 import os
 import vertexai
 from vertexai.preview import reasoning_engines
-from src.app import SlideAgentApp
+from src.app import root_agent
 from src.config import GCP_PROJECT_ID
 from src.services.auth_service import get_google_credentials
 
 # Configurações do Deploy
-DEPLOY_LOCATION = "us-central1"  # Região padrão dos agentes na Agent Platform
-STAGING_BUCKET = "gs://geo-gemini-artifacts-presales"  # Bucket de staging em us-central1
+DEPLOY_LOCATION = "us-central1"
+STAGING_BUCKET = "gs://geo-gemini-artifacts-presales"
 DISPLAY_NAME = "Gerador de Apresentações Geoambiente"
-DESCRIPTION = "Agente corporativo para criação automática de apresentações e propostas no Google Slides via Gemini 3.7 Flash."
+DESCRIPTION = "Agente corporativo oficial para criação automática de apresentações no Google Slides via Gemini 3.7 Flash e Google ADK."
 
-# Dependências completas para o container gerenciado do Vertex AI Agent Runtime
+# Dependências completas para o Agent Runtime do Vertex AI
 REQUIREMENTS = [
+    "google-adk>=2.9.0",
     "google-genai>=2.0.0",
     "google-api-python-client>=2.0.0",
     "google-auth>=2.0.0",
@@ -29,13 +30,13 @@ REQUIREMENTS = [
 ]
 
 def deploy():
-    print("=== [INICIANDO DEPLOY NO VERTEX AI AGENT RUNTIME] ===")
+    print("=== [INICIANDO DEPLOY NO VERTEX AI AGENT RUNTIME (GOOGLE ADK)] ===")
     print(f"Projeto:        {GCP_PROJECT_ID}")
     print(f"Região:         {DEPLOY_LOCATION}")
     print(f"Staging Bucket: {STAGING_BUCKET}")
     print(f"Nome do Agente: {DISPLAY_NAME}")
 
-    # Inicializa o SDK do Vertex AI com o bucket de staging
+    # Inicializa o SDK do Vertex AI
     creds = get_google_credentials()
     vertexai.init(
         project=GCP_PROJECT_ID,
@@ -44,12 +45,10 @@ def deploy():
         credentials=creds
     )
 
-    app = SlideAgentApp()
-
-    # Cria o deployment gerenciado no Agent Runtime
-    print("\nCriando o Reasoning Engine / Agent Deployment no Vertex AI...")
+    # Cria o deployment do Agente ADK no Agent Runtime
+    print("\nCriando o deployment oficial do ADK no Agent Runtime...")
     remote_agent = reasoning_engines.ReasoningEngine.create(
-        reasoning_engine=app,
+        reasoning_engine=root_agent,
         requirements=REQUIREMENTS,
         display_name=DISPLAY_NAME,
         description=DESCRIPTION,
@@ -57,11 +56,11 @@ def deploy():
     )
 
     print("\n============================================================")
-    print("  ✅ AGENTE PUBLICADO NO AGENT RUNTIME COM SUCESSO!")
+    print("  ✅ AGENTE ADK PUBLICADO COM SUCESSO NO AGENT RUNTIME!")
     print("============================================================")
     print(f"Resource Name: {remote_agent.resource_name}")
     print(f"Display Name:  {DISPLAY_NAME}")
-    print("\nEle já está visível na tela 'Deployments on Agent Runtime'!")
+    print("\nEle já está pronto e compatível nativamente com o Gemini Enterprise!")
     print("============================================================\n")
 
 if __name__ == "__main__":
