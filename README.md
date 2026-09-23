@@ -121,8 +121,49 @@ O deploy em nuvem para integração com o Gemini Enterprise é gerenciado via `g
 agents-cli deploy --update-only --service-name "Gerador de Apresentações Geoambiente" --project geo-gemini-enterprise --region us-central1 --no-confirm-project
 ```
 
-### 🔐 Autenticação no Gemini Enterprise:
-Para que o agente crie apresentações diretamente no Drive do usuário sem violar compliance corporativo:
-* O Gemini Enterprise solicita autorização via fluxo OAuth Web (`slides-agent-auth`).
-* Escopos requeridos: `https://www.googleapis.com/auth/presentations`, `https://www.googleapis.com/auth/drive`, `openid`, `email`.
-* O token é repassado automaticamente pelo Gemini Enterprise a cada invocação e consumido pelo `DriveService` e `SlidesService`.
+### 🔐 Guia Detalhado de Configuração do OAuth no Gemini Enterprise
+
+Para que o agente clone a matriz oficial diretamente para o Google Drive do usuário final sem depender de contas de serviço externas (atendendo às regras de compliance corporativo), a integração exige uma configuração precisa de **OAuth 2.0**.
+
+#### 1. Criação da Credencial no Google Cloud Console:
+* Acesse **APIs e Serviços** > **Credenciais** no projeto GCP (`geo-gemini-enterprise`).
+* Clique em **Criar Credenciais** > **ID do cliente OAuth**.
+* ⚠️ **OBRIGATÓRIO:** Selecione o tipo de aplicativo **Aplicativo da Web (Web Application)**.  
+  *(Credenciais do tipo "Desktop Application" **não funcionam** no Gemini Enterprise e disparam erro 400 `invalid_request / GeneralOAuthFlow`).*
+* No campo **URIs de redirecionamento autorizados**, adicione a URL de callback fornecida pelo Gemini Enterprise durante a criação da autorização.
+
+#### 2. Campos de Configuração no Gemini Enterprise:
+Na interface do Gemini Enterprise (ao vincular o Custom Agent / Reasoning Engine):
+
+| Campo | Valor Exato / Homologado |
+| :--- | :--- |
+| **Nome da Autorização** | `slides-agent-auth` |
+| **Grant Type** | `Authorization Code` |
+| **Client ID** | ID do cliente gerado no GCP (`...apps.googleusercontent.com`) |
+| **Client Secret** | Chave secreta correspondente ao cliente Web |
+| **Token URI** | `https://oauth2.googleapis.com/token` |
+| **Authorization URI** | *(Ver formato completo abaixo com query params obrigatórios)* |
+
+##### 📌 URL Completa da Authorization URI:
+O servidor de autorização do Google e a validação do Gemini Enterprise exigem explicitamente os parâmetros de offline access, consentimento e escopos embutidos na URL:
+
+```text
+https://accounts.google.com/o/oauth2/v2/auth?response_type=code&access_type=offline&prompt=consent&scope=https://www.googleapis.com/auth/presentations+https://www.googleapis.com/auth/drive+openid+email+profile
+```
+
+#### 3. Escopos Solicitados (Scopes):
+* `https://www.googleapis.com/auth/presentations` (Criação, leitura e edição de slides)
+* `https://www.googleapis.com/auth/drive` (Clonagem e compartilhamento do arquivo matriz)
+* `openid`
+* `email`
+* `profile`
+
+#### 4. Erros Comuns e Como Foram Resolvidos:
+* **Erro:** `The authorization URI must contain 'access_type=offline'`  
+  👉 **Solução:** Adicionar `&access_type=offline` na Authorization URI para permitir refresh tokens seguros.
+* **Erro:** `Required parameter is missing: response_type (Error 400: invalid_request)`  
+  👉 **Solução:** Incluir explicitamente `?response_type=code` na URL base de autorização.
+* **Erro:** `Missing required parameter: scope`  
+  👉 **Solução:** Encadear todos os escopos diretamente na query string da Authorization URI concatenados com `+`.
+* **Erro:** `404: File not found` na clonagem  
+  👉 **Solução:** Garantir que o token repassado pelo Gemini Enterprise no payload JSON seja capturado e injetado no `ContextVar` do runtime, chamando a API do Drive com a identidade do usuário e nunca como a Service Account.
