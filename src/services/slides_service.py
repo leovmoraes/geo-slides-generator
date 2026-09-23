@@ -1,4 +1,4 @@
-﻿"""
+"""
 Serviço de Operações no Google Slides (Batch Updates Determinísticos)
 """
 
@@ -31,9 +31,20 @@ class SlidesService:
         """
         logger.info(f"Aplicando especificação de slides na apresentação {presentation_id}...")
 
-        presentation = self.client.presentations().get(
-            presentationId=presentation_id
-        ).execute()
+        try:
+            presentation = self.client.presentations().get(
+                presentationId=presentation_id
+            ).execute()
+        except Exception as e:
+            err_str = str(e).lower()
+            if "refresherror" in str(type(e).__name__).lower() or "refresh" in err_str or "token" in err_str or "unauthorized" in err_str:
+                logger.info("Detectada falha no token em SlidesService. Alternando para Service Account da plataforma (ADC)...")
+                self.client = get_slides_service(force_service_account=True)
+                presentation = self.client.presentations().get(
+                    presentationId=presentation_id
+                ).execute()
+            else:
+                raise
 
         slides = presentation.get("slides", [])
         num_slides = len(slides)
@@ -75,10 +86,22 @@ class SlidesService:
         # Executa tudo em lote atômico
         logger.info(f"Executando batchUpdate com {len(requests)} operações...")
         body = {"requests": requests}
-        self.client.presentations().batchUpdate(
-            presentationId=presentation_id,
-            body=body
-        ).execute()
+        try:
+            self.client.presentations().batchUpdate(
+                presentationId=presentation_id,
+                body=body
+            ).execute()
+        except Exception as e:
+            err_str = str(e).lower()
+            if "refresherror" in str(type(e).__name__).lower() or "refresh" in err_str or "token" in err_str or "unauthorized" in err_str:
+                logger.info("Detectada falha no token no batchUpdate. Alternando para Service Account da plataforma (ADC)...")
+                self.client = get_slides_service(force_service_account=True)
+                self.client.presentations().batchUpdate(
+                    presentationId=presentation_id,
+                    body=body
+                ).execute()
+            else:
+                raise
 
         url = f"https://docs.google.com/presentation/d/{presentation_id}/edit"
         logger.info(f"Apresentação concluída com sucesso! URL: {url}")

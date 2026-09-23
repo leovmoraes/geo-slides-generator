@@ -1,4 +1,4 @@
-﻿"""
+"""
 Agente oficial do ADK para geração de apresentações corporativas Geoambiente & Google Cloud.
 Suporta autenticação delegada do Usuário Final via OAuth do Gemini Enterprise.
 """
@@ -37,22 +37,106 @@ def generate_slides_presentation(prompt: str, tool_context=None) -> str:
     """
     logger.info(f"Tool generate_slides_presentation chamada com prompt: {prompt}")
     
-    # 1. Extração do Token OAuth do Usuário Final (se fornecido pelo Gemini Enterprise)
+    # 1. Extração do Token OAuth do Usuário Final (repassado pelo Gemini Enterprise)
     user_token = None
-    if tool_context:
+
+    # 1.1 ContextVar propagado pelo adaptador HTTP da Reasoning Engine
+    try:
+        from src.services.auth_service import _request_user_token
+        ctx_token = _request_user_token.get()
+        if ctx_token:
+            user_token = ctx_token
+            logger.info(f"Token OAuth obtido via ContextVar da requisição (prefixo: {user_token[:10]}...)")
+    except Exception as ctx_err:
+        logger.debug(f"Erro ao ler ContextVar de token: {ctx_err}")
+
+    # 1.2 Inspecionar tool_context.state (onde AdkApp armazena request.authorizations)
+    if not user_token and tool_context and hasattr(tool_context, "state") and tool_context.state:
         try:
-            if hasattr(tool_context, "get_credential") and tool_context.get_credential():
-                cred = tool_context.get_credential()
-                if isinstance(cred, dict):
-                    user_token = cred.get("token") or cred.get("access_token")
-                elif isinstance(cred, str):
-                    user_token = cred
-            elif hasattr(tool_context, "get_auth_response") and tool_context.get_auth_response():
-                auth_resp = tool_context.get_auth_response()
-                if isinstance(auth_resp, dict):
-                    user_token = auth_resp.get("access_token") or auth_resp.get("token")
+            logger.info(f"Inspecionando tool_context.state. Chaves disponíveis: {list(tool_context.state.keys())}")
+            for k, v in tool_context.state.items():
+                tok = None
+                if isinstance(v, str) and (v.startswith("ya29.") or "auth" in k.lower() or "token" in k.lower()):
+                    tok = v
+                elif isinstance(v, dict):
+                    tok = v.get("access_token") or v.get("accessToken") or v.get("token")
+                if tok:
+                    user_token = tok
+                    logger.info(f"Token OAuth extraído com sucesso de tool_context.state['{k}'] (prefixo: {user_token[:10]}...)")
+                    break
+        except Exception as state_err:
+            logger.warning(f"Erro ao inspecionar tool_context.state: {state_err}")
+
+    # 1.3 Inspecionar _invocation_context e outros atributos do tool_context
+    if not user_token and tool_context:
+        try:
+            inv_ctx = getattr(tool_context, "_invocation_context", None)
+            if inv_ctx and hasattr(inv_ctx, "credential_by_key"):
+                for k, c in inv_ctx.credential_by_key.items():
+                    if hasattr(c, "oauth2") and c.oauth2:
+                        user_token = getattr(c.oauth2, "access_token", None) or getattr(c.oauth2, "token", None)
+                        if user_token:
+                            logger.info(f"Token OAuth do usuário extraído de credential_by_key['{k}']")
+                            break
+                    if hasattr(c, "http") and c.http and hasattr(c.http, "credentials"):
+                        user_token = getattr(c.http.credentials, "token", None)
+                        if user_token:
+                            logger.info(f"Token Bearer do usuário extraído de credential_by_key['{k}']")
+                            break
+                    if isinstance(c, dict):
+                        user_token = c.get("access_token") or c.get("token") or (c.get("oauth2", {}).get("access_token") if isinstance(c.get("oauth2"), dict) else None)
+                        if user_token:
+                            logger.info(f"Token de usuário extraído de dict em credential_by_key['{k}']")
+                            break
+
+            # 1.4 Tentar chaves comuns usando get_credential(key)
+            if not user_token and hasattr(tool_context, "get_credential"):
+                for candidate_key in ["slides-agent-auth", "google-slides-oauth", "oauth2", "google", "default", "auth"]:
+                    try:
+                        c = tool_context.get_credential(candidate_key)
+                        if c:
+                            if hasattr(c, "oauth2") and c.oauth2:
+                                user_token = getattr(c.oauth2, "access_token", None) or getattr(c.oauth2, "token", None)
+                            elif hasattr(c, "http") and c.http and hasattr(c.http, "credentials"):
+                                user_token = getattr(c.http.credentials, "token", None)
+                            elif isinstance(c, dict):
+                                user_token = c.get("access_token") or c.get("token")
+                            elif isinstance(c, str):
+                                user_token = c
+                            if user_token:
+                                logger.info(f"Token de usuário extraído via get_credential('{candidate_key}')")
+                                break
+                    except Exception as get_err:
+                        logger.debug(f"Tentativa com chave '{candidate_key}' falhou: {get_err}")
+
+            # 1.5 Tentar atributos diretos em tool_context
+            if not user_token:
+                for attr in ["credentials", "credential", "auth_response", "auth"]:
+                    val = getattr(tool_context, attr, None)
+                    if val and not callable(val):
+                        if isinstance(val, dict):
+                            user_token = val.get("access_token") or val.get("token")
+                        elif isinstance(val, str):
+                            user_token = val
+                        if user_token:
+                            logger.info(f"Token extraído via atributo '{attr}'!")
+                            break
         except Exception as e:
-            logger.debug(f"Aviso ao extrair credencial do tool_context: {e}")
+            logger.warning(f"Aviso ao extrair credencial do tool_context: {e}")
+
+    if not user_token:
+        from src.services.auth_service import TOKEN_PATH
+        import os
+        if os.path.exists(TOKEN_PATH):
+            logger.info("user_token não veio no request, mas token.json local está disponível para desenvolvimento.")
+        else:
+            logger.error("Nenhum token OAuth de usuário delegado foi detectado na chamada em ambiente de produção.")
+            return (
+                "⚠️ **Autorização do Google Workspace necessária**\n\n"
+                "Para criar a apresentação corporativa oficial diretamente no seu Google Drive seguindo o padrão oficial da Geoambiente, "
+                "é necessário autorizar o agente no Gemini Enterprise (autorização `slides-agent-auth`).\n\n"
+                "Por favor, autorize a extensão na barra de ferramentas ou configurações do Gemini Enterprise e envie sua solicitação novamente."
+            )
 
     # 2. Execução do Workflow
     workflow = _get_workflow()

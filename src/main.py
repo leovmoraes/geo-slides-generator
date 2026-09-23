@@ -32,13 +32,13 @@ def main():
         print("\n" + "="*60)
         print("  ✅ APRESENTAÇÃO GERADA COM SUCESSO!")
         print("="*60)
-        print(f"📊 Título: {result['title']}")
-        if result['client']:
-            print(f"🏢 Cliente: {result['client']}")
-        print(f"📑 Total de Slides: {result['total_content_slides']}")
-        print(f"⏱️ Tempo de Execução: {result['elapsed_seconds']}s")
+        print(f"📊 Título: {result.title}")
+        if result.client_name:
+            print(f"🏢 Cliente: {result.client_name}")
+        print(f"📑 Total de Slides: {result.slide_count}")
+        print(f"⏱️ Tempo de Execução: {result.execution_time_seconds:.2f}s")
         print(f"\n🔗 Link do Google Slides:")
-        print(f"👉 {result['url']}\n")
+        print(f"👉 {result.presentation_url}\n")
         print("="*60 + "\n")
     except Exception as e:
         logging.error(f"Falha na execução do workflow: {e}", exc_info=True)

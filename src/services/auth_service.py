@@ -1,4 +1,4 @@
-﻿"""
+"""
 Serviço de Autenticação com Google Workspace e GCP
 Suporta OAuth2 do Usuário Final (Token de delegação repassado via cabeçalho HTTP/ADK),
 OAuth2 do Projeto (credentials.json/token.json), Service Account e ADC.
@@ -33,23 +33,24 @@ def set_request_user_token(token: Optional[str]):
     """Define o token do usuário autenticado no contexto da requisição atual."""
     _request_user_token.set(token)
 
-def get_google_credentials(user_token: Optional[str] = None):
+def get_google_credentials(user_token: Optional[str] = None, force_service_account: bool = False):
     """
     Obtém credenciais válidas:
-    1. Token de acesso OAuth do Usuário Final (repassado pelo Gemini Enterprise)
+    1. Token de acesso OAuth do Usuário Final (se não force_service_account)
     2. token.json / credentials.json (OAuth interno da Geoambiente)
     3. Service Account Key File (GOOGLE_APPLICATION_CREDENTIALS)
     4. Application Default Credentials (ADC)
     """
-    token = user_token or _request_user_token.get()
-    if token:
-        logger.info("Utilizando credencial OAuth delegada do usuário final...")
-        return Credentials(token=token, scopes=SCOPES)
+    if not force_service_account:
+        token = user_token or _request_user_token.get()
+        if token:
+            logger.info("Utilizando credencial OAuth delegada do usuário final...")
+            return Credentials(token=token, scopes=SCOPES)
 
     creds = None
 
-    # 2. Tentar token.json existente
-    if os.path.exists(TOKEN_PATH):
+    # 2. Tentar token.json existente (se não forçado a Service Account)
+    if not force_service_account and os.path.exists(TOKEN_PATH):
         try:
             creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
             if creds and creds.valid:
@@ -70,21 +71,22 @@ def get_google_credentials(user_token: Optional[str] = None):
             service_account_file, scopes=SCOPES
         )
 
-    # 4. Tentar ADC
+    # 4. Tentar ADC (Application Default Credentials / Service Account da plataforma)
     try:
         creds, _ = google.auth.default(scopes=SCOPES)
+        logger.info("Utilizando credenciais ADC (Application Default Credentials).")
         return creds
     except Exception as adc_err:
         logger.warning(f"ADC warning: {adc_err}")
 
     return creds
 
-def get_drive_service(user_token: Optional[str] = None):
+def get_drive_service(user_token: Optional[str] = None, force_service_account: bool = False):
     """Retorna cliente autenticado da Google Drive API v3"""
-    credentials = get_google_credentials(user_token=user_token)
+    credentials = get_google_credentials(user_token=user_token, force_service_account=force_service_account)
     return build("drive", "v3", credentials=credentials)
 
-def get_slides_service(user_token: Optional[str] = None):
+def get_slides_service(user_token: Optional[str] = None, force_service_account: bool = False):
     """Retorna cliente autenticado da Google Slides API v1"""
-    credentials = get_google_credentials(user_token=user_token)
+    credentials = get_google_credentials(user_token=user_token, force_service_account=force_service_account)
     return build("slides", "v1", credentials=credentials)

@@ -1,4 +1,4 @@
-﻿# Copyright 2026 Google LLC
+# Copyright 2026 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,21 +30,71 @@ logger = logging.getLogger(__name__)
 def _no_op_instrumentor_builder(project_id: str) -> None:
     return None
 
-def _extract_token_from_request(request: Request) -> None:
-    """Extrai token OAuth delegado do usuário a partir dos cabeçalhos da requisição."""
-    auth_header = (
-        request.headers.get("authorization") or
-        request.headers.get("x-goog-user-token") or
-        request.headers.get("x-forwarded-authorization") or
-        request.headers.get("x-serverless-authorization")
-    )
-    if auth_header:
-        token = auth_header
-        if token.lower().startswith("bearer "):
-            token = token[7:].strip()
-        logger.info("Token de usuário detectado e injetado no contexto da requisição.")
+def _extract_token_from_request_and_body(request: Request, body: dict) -> None:
+    """Extrai token OAuth delegado do usuário final a partir dos cabeçalhos HTTP
+    ou do payload JSON enviado pelo Gemini Enterprise / Agent Engine.
+    
+    NOTA: O cabeçalho genérico 'authorization' NÃO deve ser capturado como token do Workspace,
+    pois ele contém o token IAM da infraestrutura GCP / Vertex AI que causa RefreshError
+    ao ser enviado para as APIs do Google Workspace (Drive/Slides).
+    """
+    token = None
+
+    # 1. Inspecionar cabeçalhos específicos de autenticação de usuário
+    for h in ["x-goog-user-token", "x-user-oauth-token", "x-goog-authenticated-user-token"]:
+        val = request.headers.get(h)
+        if val:
+            if val.lower().startswith("bearer "):
+                val = val[7:].strip()
+            token = val
+            logger.info(f"Token de usuário delegado detectado no cabeçalho '{h}' (prefixo: {token[:10]}...)")
+            break
+
+    # 2. Inspecionar payload JSON do Gemini Enterprise (request_json -> authorizations)
+    if not token and isinstance(body, dict):
+        kwargs = body.get("input") or {}
+        req_json_str = kwargs.get("request_json")
+        if req_json_str:
+            try:
+                req_data = json.loads(req_json_str) if isinstance(req_json_str, str) else req_json_str
+                if isinstance(req_data, dict):
+                    authorizations = req_data.get("authorizations") or {}
+                    logger.info(f"Autorizações recebidas em request_json: {list(authorizations.keys())}")
+                    for auth_id, auth_obj in authorizations.items():
+                        tok = None
+                        if isinstance(auth_obj, dict):
+                            tok = auth_obj.get("access_token") or auth_obj.get("accessToken") or auth_obj.get("token")
+                        elif isinstance(auth_obj, str):
+                            tok = auth_obj
+                        if tok:
+                            token = tok
+                            logger.info(f"Token OAuth extraído com sucesso de authorizations['{auth_id}'] (prefixo: {token[:10]}...)")
+                            break
+            except Exception as e:
+                logger.warning(f"Erro ao analisar authorizations do request_json: {e}")
+
+        # 3. Inspecionar authorizations diretamente no body ou em input
+        if not token:
+            for container in [body, kwargs]:
+                auths = container.get("authorizations")
+                if isinstance(auths, dict):
+                    for auth_id, auth_obj in auths.items():
+                        tok = None
+                        if isinstance(auth_obj, dict):
+                            tok = auth_obj.get("access_token") or auth_obj.get("accessToken") or auth_obj.get("token")
+                        elif isinstance(auth_obj, str):
+                            tok = auth_obj
+                        if tok:
+                            token = tok
+                            logger.info(f"Token OAuth extraído de container direto authorizations['{auth_id}'] (prefixo: {token[:10]}...)")
+                            break
+                if token:
+                    break
+
+    if token:
         set_request_user_token(token)
     else:
+        logger.info("Nenhum token OAuth de usuário delegado foi detectado nesta requisição.")
         set_request_user_token(None)
 
 def attach_reasoning_engine_routes(app: FastAPI) -> None:
@@ -86,8 +136,8 @@ def attach_reasoning_engine_routes(app: FastAPI) -> None:
 
     @app.post("/api/stream_reasoning_engine")
     async def stream_query(request: Request) -> responses.StreamingResponse:
-        _extract_token_from_request(request)
         body = await request.json()
+        _extract_token_from_request_and_body(request, body)
         method = resolve_method(body["class_method"], streaming=True)
         kwargs = body.get("input") or {}
         stream = (
@@ -110,8 +160,8 @@ def attach_reasoning_engine_routes(app: FastAPI) -> None:
 
     @app.post("/api/reasoning_engine")
     async def query(request: Request) -> responses.JSONResponse:
-        _extract_token_from_request(request)
         body = await request.json()
+        _extract_token_from_request_and_body(request, body)
         method = resolve_method(body["class_method"], streaming=False)
         kwargs = body.get("input") or {}
         if inspect.iscoroutinefunction(method):

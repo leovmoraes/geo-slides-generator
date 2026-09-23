@@ -1,4 +1,4 @@
-﻿"""
+"""
 Script de Deploy oficial para o Vertex AI Agent Runtime usando Google ADK.
 Publica o agente oficial diretamente no projeto geo-gemini-enterprise.
 """
@@ -6,7 +6,7 @@ Publica o agente oficial diretamente no projeto geo-gemini-enterprise.
 import os
 import vertexai
 from vertexai.preview import reasoning_engines
-from src.app import root_agent
+from app.agent import root_agent
 from src.config import GCP_PROJECT_ID
 from src.services.auth_service import get_google_credentials
 
@@ -52,7 +52,7 @@ def deploy():
         requirements=REQUIREMENTS,
         display_name=DISPLAY_NAME,
         description=DESCRIPTION,
-        extra_packages=["./src"]
+        extra_packages=["./src", "./app"]
     )
 
     print("\n============================================================")

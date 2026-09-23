@@ -1,4 +1,4 @@
-﻿"""
+"""
 Agente 2: Slide Master Builder (Automação Determinística via Drive & Slides API)
 """
 
@@ -23,10 +23,11 @@ class BuilderAgent:
         3. Insere os slides de conteúdo com cards, cores e tipografia oficiais.
         4. Retorna a URL final da apresentação editável.
         """
-        file_name = f"{spec.title} - {spec.client_name}"
+        resolved_client = getattr(spec, "client_name", None) or getattr(spec, "client", None) or "Corporativo"
+        file_name = f"{spec.title} - {resolved_client}"
         logger.info(f"Agente 2 (Builder) iniciando construção de '{file_name}'...")
 
-        # 1. Clonar Template Matriz
+        # 1. Clonar Template Matriz (ou criar nova se inacessível)
         presentation_id = self.drive_service.clone_matrix_template(title=file_name)
 
         # 2. Aplicar especificações visuais e de conteúdo
@@ -34,6 +35,10 @@ class BuilderAgent:
             presentation_id=presentation_id,
             spec=spec
         )
+
+        # 3. Garantir compartilhamento com permissão de edição para o usuário / domínio
+        logger.info(f"Agente 2 configurando permissão de edição da apresentação {presentation_id}...")
+        self.drive_service.share_with_domain(presentation_id, role="writer")
 
         logger.info(f"Agente 2 concluiu a montagem com sucesso! URL: {final_url}")
         return final_url

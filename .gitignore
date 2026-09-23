@@ -27,3 +27,8 @@ service_account*.json
 .DS_Store
 *.swp
 *.swo
+
+# Deploy & Runtime Metadata
+deployment_metadata.json
+scratch/
+scratch_*.py
