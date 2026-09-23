@@ -167,3 +167,57 @@ https://accounts.google.com/o/oauth2/v2/auth?response_type=code&access_type=offl
   👉 **Solução:** Encadear todos os escopos diretamente na query string da Authorization URI concatenados com `+`.
 * **Erro:** `404: File not found` na clonagem  
   👉 **Solução:** Garantir que o token repassado pelo Gemini Enterprise no payload JSON seja capturado e injetado no `ContextVar` do runtime, chamando a API do Drive com a identidade do usuário e nunca como a Service Account.
+
+---
+
+## 🎨 Como Atualizar o Template Matriz da Apresentação (Novo Padrão Visual do Marketing)
+
+Quando a equipe de Marketing atualizar a identidade visual ou homologar uma nova apresentação matriz, você pode trocar o template de **duas formas**: sem alterar código (via variável de ambiente) ou atualizando o padrão no repositório.
+
+### 1. Onde Obter o ID da Nova Apresentação:
+Na URL da apresentação aberta no Google Slides pelo Marketing:
+```text
+https://docs.google.com/presentation/d/19F33ff11h0p2NF6GEcYAPj3se0eGzWKwzir3szAZpiI/edit
+                                       ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+                                                 TEMPLATE_PRESENTATION_ID
+```
+Copie a sequência alfanumérica entre `/d/` e `/edit`.
+
+### 2. Requisitos de Acesso da Nova Matriz:
+* O arquivo deve estar salvo no Google Drive da organização Geoambiente (ex: em um Drive Compartilhado ou compartilhado com o domínio `@geoambiente.com.br` com permissão de Leitor/Comentador).
+* **Não é necessário** compartilhar com contas de serviço externas, pois a clonagem é feita diretamente com o token do usuário final autenticado no Gemini Enterprise.
+
+### 3. Atualizando em Produção no Vertex AI Reasoning Engine:
+
+#### Opção A: Atualização Imediata via `--update-env-vars` (Recomendado)
+Você pode atualizar a variável de ambiente diretamente no container em nuvem sem alterar código:
+
+```bash
+agents-cli deploy --update-only \
+  --service-name "Gerador de Apresentações Geoambiente" \
+  --project geo-gemini-enterprise \
+  --region us-central1 \
+  --no-confirm-project \
+  --update-env-vars TEMPLATE_PRESENTATION_ID="NOVO_ID_AQUI"
+```
+
+#### Opção B: Atualização no Código (`src/config.py`)
+Para manter a nova matriz como o valor padrão fixo no repositório:
+1. Altere o ID padrão em [src/config.py](file:///home/leovmoraes/projetos/slides-agent/src/config.py#L18):
+   ```python
+   TEMPLATE_PRESENTATION_ID = os.getenv(
+       "TEMPLATE_PRESENTATION_ID", 
+       "NOVO_ID_AQUI"
+   )
+   ```
+2. Atualize o `.env` local e `.env.example`.
+3. Faça o commit e reexecute o deploy:
+   ```bash
+   agents-cli deploy --update-only --service-name "Gerador de Apresentações Geoambiente" --project geo-gemini-enterprise --region us-central1 --no-confirm-project
+   ```
+
+### 4. Atualizando em Ambiente Local:
+Basta alterar a variável no seu arquivo `.env`:
+```bash
+TEMPLATE_PRESENTATION_ID="NOVO_ID_AQUI"
+```
