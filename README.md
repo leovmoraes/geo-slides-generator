@@ -262,6 +262,46 @@ TEMPLATE_PRESENTATION_ID="NOVO_ID_AQUI"
 
 ---
 
+## 🤖 Como Atualizar a Versão do Modelo Gemini (ex: Gemini 4.0, 4.5 Flash)
+
+Os modelos de IA do ecossistema Google Cloud evoluem periodicamente. O agente foi arquitetado para permitir a troca do modelo (ex: de `gemini-3.7-flash` para `gemini-4.0-flash` ou `gemini-4.5-flash`) de forma desacoplada através da variável de ambiente `GEMINI_MODEL`.
+
+### 1. Atualização Imediata em Produção (Sem mexer em código):
+Execute o deploy com o parâmetro `--update-env-vars`:
+
+```bash
+agents-cli deploy --update-only \
+  --service-name "Gerador de Apresentações Geoambiente" \
+  --project geo-gemini-enterprise \
+  --region us-central1 \
+  --no-confirm-project \
+  --update-env-vars GEMINI_MODEL="gemini-4.0-flash"
+```
+*(O Vertex AI Agent Runtime atualiza a variável em segundos e passa a invocar o novo modelo tanto no Agente Conversacional quanto no Planejador de Conteúdo).*
+
+### 2. Atualização Definitiva no Repositório:
+1. Altere o valor padrão em `src/config.py`:
+   ```python
+   DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-4.0-flash")
+   ```
+2. Atualize o arquivo `.env` e `.env.example`:
+   ```bash
+   GEMINI_MODEL=gemini-4.0-flash
+   ```
+3. Execute a suíte de testes locais para homologação:
+   ```bash
+   .venv/bin/pytest tests/unit tests/test_schema.py tests/test_workflow.py
+   ```
+4. Faça o commit e publique o novo contêiner:
+   ```bash
+   agents-cli deploy --update-only --service-name "Gerador de Apresentações Geoambiente" --project geo-gemini-enterprise --region us-central1 --no-confirm-project
+   ```
+
+> [!NOTE]
+> **Compatibilidade de Região:** Lembre-se que alguns modelos novos são lançados inicialmente com endpoint global (`GOOGLE_CLOUD_LOCATION=global`) ou regional (`us-central1`). O projeto já está configurado com fallback automático de localização.
+
+---
+
 ## 🎨 Ícone Oficial no Gemini Enterprise
 
 O agente possui o logotipo oficial da Geoambiente configurado diretamente no registro do **Discovery Engine**:

@@ -10,11 +10,13 @@ from google.adk.apps import App
 from google.adk.models import Gemini
 from google.genai import types
 
+import os
+from src.config import DEFAULT_GEMINI_MODEL
 from src.workflow.orchestrator import SlideMasterWorkflow
 
 logger = logging.getLogger(__name__)
 
-MODEL = "gemini-3.7-flash"
+MODEL = os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL)
 
 # Instância única do workflow
 _workflow = None
