@@ -66,6 +66,31 @@ Antes de criar a apresentação, o agente valida com o usuário três pré-requi
 
 ---
 
+## 💰 Estimativa de Investimento por Slide e Apresentação (Gemini 3.7 Flash)
+
+O custo de geração é baseado na tabela de consumo de tokens da API **Gemini 3.7 Flash Standard** no Vertex AI:
+
+### 1. Tabela de Precificação do Modelo (Google Cloud)
+* **Input (Tokens de Entrada):** `\$0.75` por 1 milhão de tokens
+* **Output (Tokens de Saída):** `\$3.75` por 1 milhão de tokens
+* ⚠️ **Vigência:** Tarifa promocional introdutória válida até **31 de dezembro de 2026** *(a partir de 1º de janeiro de 2027, os preços dobram para `\$1.50` input / `\$7.50` output por 1 milhão de tokens)*.
+
+### 2. Média de Consumo de Tokens por Execução
+* **Entrada (Input):** ~1.000 a 1.500 tokens (Briefing do usuário, contexto do lead, persona e validação do schema Pydantic).
+* **Saída (Output):** ~1.500 a 2.500 tokens (Estruturação completa em JSON de 4 a 6 slides de conteúdo com cards, tópicos e pilares).
+
+### 3. Custo por Apresentação e por Slide
+
+| Período | Custo Total por Apresentação (~18 slides) | Custo por Slide Dinâmico Gerado (~5 slides) | Custo Médio por Slide da Apresentação Completa |
+| :--- | :--- | :--- | :--- |
+| **Até 31/12/2026** *(Tarifa Atual)* | **~\$0,0084** *(< 1 centavo / ~R\$ 0,04)* | **~\$0,0017** *(fração de centavo / ~R\$ 0,009)* | **~\$0,0004** *(~R\$ 0,002)* |
+| **A partir de 01/01/2027** *(Tabela Cheia)* | **~\$0,0168** *(~1,7 centavos / ~R\$ 0,09)* | **~\$0,0034** *(~R\$ 0,018)* | **~\$0,0009** *(~R\$ 0,005)* |
+
+> [!TIP]
+> **APIs do Google Workspace Gratuitas:** Todas as chamadas de clonagem, estruturação e compartilhamento via Google Slides API e Google Drive API não possuem custo por chamada (inclusas nas cotas do Google Workspace). O container no Agent Runtime escala para zero quando inativo, sendo tarifado apenas pelos segundos de execução do request (~15-20s).
+
+---
+
 ## 📁 Estrutura do Projeto
 
 ```
