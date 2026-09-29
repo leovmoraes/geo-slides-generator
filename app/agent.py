@@ -4,6 +4,7 @@ Suporta autenticação delegada do Usuário Final via OAuth do Gemini Enterprise
 """
 
 import logging
+from typing import Optional, Dict, Any, List
 from google.adk.agents import Agent
 from google.adk.apps import App
 from google.adk.models import Gemini
@@ -24,18 +25,29 @@ def _get_workflow() -> SlideMasterWorkflow:
         _workflow = SlideMasterWorkflow()
     return _workflow
 
-def generate_slides_presentation(prompt: str, tool_context=None) -> str:
+def generate_slides_presentation(
+    prompt: str, 
+    lead_name: Optional[str] = None, 
+    presenter_name: Optional[str] = None,
+    presenter_email: Optional[str] = None,
+    send_date: Optional[str] = None, 
+    tool_context=None
+) -> str:
     """
     Gera uma apresentação corporativa completa e editável no Google Slides seguindo a identidade visual oficial da Geoambiente e Google Cloud.
     
     Args:
-        prompt: Briefing da apresentação, tema, cliente, pilares estratégicos e escopo desejado.
+        prompt: Briefing da apresentação, tema, pilares estratégicos e escopo desejado.
+        lead_name: Nome do Lead / Cliente corporativo destinatário da proposta comercial (substitui 'Nome do Lead' na capa oficial).
+        presenter_name: Nome do consultor / apresentador corporativo Geoambiente responsável pela proposta (substitui 'Nome Sobrenome' no slide final).
+        presenter_email: E-mail corporativo do consultor Geoambiente (ex: nome.sobrenome@geoambiente.com.br). Se omitido, é derivado automaticamente do presenter_name.
+        send_date: Data de envio da proposta no formato DD/MM/AAAA ou mês/ano (substitui '[Data de Envio]' na capa oficial). Se omitido, utiliza a data corrente.
         tool_context: Contexto do ADK contendo a autenticação delegada do usuário final.
         
     Returns:
         Uma mensagem formatada com o título, cliente e o link editável do Google Slides pronto.
     """
-    logger.info(f"Tool generate_slides_presentation chamada com prompt: {prompt}")
+    logger.info(f"Tool generate_slides_presentation chamada. Lead: '{lead_name}', Apresentador: '{presenter_name}' ({presenter_email}), Data: '{send_date}', Prompt: {prompt}")
     
     # 1. Extração do Token OAuth do Usuário Final (repassado pelo Gemini Enterprise)
     user_token = None
@@ -140,12 +152,19 @@ def generate_slides_presentation(prompt: str, tool_context=None) -> str:
 
     # 2. Execução do Workflow
     workflow = _get_workflow()
-    result = workflow.run(prompt, user_token=user_token)
+    result = workflow.run(
+        prompt, 
+        user_token=user_token,
+        lead_name=lead_name,
+        send_date=send_date,
+        presenter_name=presenter_name,
+        presenter_email=presenter_email
+    )
     
     return (
         f"### ✅ Apresentação gerada com sucesso no padrão oficial Geoambiente!\n\n"
         f"- **Título:** {result.title}\n"
-        f"- **Cliente:** {result.client_name}\n"
+        f"- **Lead / Cliente:** {result.client_name}\n"
         f"- **Total de Slides:** {result.slide_count}\n"
         f"- **Tempo de Criação:** {round(result.execution_time_seconds, 2)}s\n\n"
         f"🔗 **[Abrir Apresentação no Google Slides]({result.presentation_url})**"
@@ -160,9 +179,28 @@ root_agent = Agent(
     instruction="""Você é o Gerador de Apresentações Corporativas da Geoambiente.
 Sua missão é gerar apresentações, decks e propostas comerciais completas no padrão corporativo oficial Geoambiente & Google Cloud.
 
-[INSTRUÇÕES ESSENCIAIS]:
-1. Sempre que o usuário solicitar a criação de uma proposta, deck, apresentação ou conjunto de slides, acione IMEDIATAMENTE a ferramenta `generate_slides_presentation` passando o briefing do usuário.
-2. Após a execução da ferramenta, responda ao usuário de forma executiva, fornecendo o link direto do Google Slides retornado pela ferramenta.""",
+[PRÉ-REQUISITOS OBRIGATÓRIOS ANTES DE GERAR A APRESENTAÇÃO]:
+Para personalizar a proposta comercial com precisão institucional, você DEVE coletar os seguintes dados antes de acionar a ferramenta:
+
+1. **Nome do Lead (Cliente / Empresa)**:
+   - Se o usuário NÃO informou a empresa ou cliente destinatário no pedido/briefing, PERGUNTE educadamente: "Para qual cliente ou empresa lead será esta proposta comercial?".
+
+2. **Apresentador / Consultor Geoambiente (Slide Final de Contato)**:
+   - Como nem sempre a pessoa que gera a apresentação é quem vai apresentá-la (pode ser gerada para outro executivo de contas ou colega de equipe), PERGUNTE: "Quem será o consultor/apresentador responsável por esta proposta? (Informe o Nome e E-mail, ou confirme se deseja usar o seu próprio contato)".
+   - Se o usuário disser que é para ele mesmo (ou confirmar), chame a ferramenta deixando `presenter_name` vazio (None), e o sistema detectará automaticamente a identidade dele via Google Workspace OAuth.
+   - Se o usuário informar o nome (ex: "Leonardo Moraes"), passe em `presenter_name`. O e-mail corporativo será gerado automaticamente no padrão `nome.sobrenome@geoambiente.com.br` caso não seja explicitado um e-mail diferente.
+
+3. **Data de Envio**:
+   - Se o usuário especificou uma data (ex: '29/09/2026' ou 'Outubro/2026'), use-a. Se não especificou, você pode sugerir ou usar a data atual.
+
+[DIRETRIZES DE EXECUÇÃO]:
+1. Assim que tiver o briefing e os pré-requisitos alinhados com o usuário (Lead e Apresentador), acione IMEDIATAMENTE a ferramenta `generate_slides_presentation` passando:
+   - `prompt`: O briefing completo da proposta comercial.
+   - `lead_name`: O nome do lead / cliente identificado.
+   - `presenter_name`: O nome do consultor/apresentador informado pelo usuário (ou None se for usar o próprio usuário).
+   - `presenter_email`: O e-mail do consultor (se informado).
+   - `send_date`: A data de envio informada ou desejada (se omitida, o sistema usará a data de hoje).
+2. Após a execução da ferramenta, responda ao usuário de forma executiva, cordial e sucinta, fornecendo o link direto do Google Slides retornado pela ferramenta.""",
     tools=[generate_slides_presentation],
 )
 

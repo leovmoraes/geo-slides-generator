@@ -23,9 +23,33 @@ class BuilderAgent:
         3. Insere os slides de conteúdo com cards, cores e tipografia oficiais.
         4. Retorna a URL final da apresentação editável.
         """
-        resolved_client = getattr(spec, "client_name", None) or getattr(spec, "client", None) or "Corporativo"
+        generic_names = {
+            "equipe comercial geoambiente", 
+            "equipe geoambiente", 
+            "geoambiente cloud solutions", 
+            "equipe especialista geoambiente",
+            "especialista geoambiente"
+        }
+        
+        # Identificar dados do consultor / apresentador corporativo
+        has_valid_name = bool(spec.presenter_name and spec.presenter_name.strip().lower() not in generic_names)
+        has_valid_email = bool(spec.presenter_email and spec.presenter_email.strip().lower() not in {"contato@geoambiente.com.br", "email@geoambiente.com.br"})
+
+        if not has_valid_name or not has_valid_email:
+            user_info = self.drive_service.get_user_info()
+            if not has_valid_name and user_info.get("name"):
+                spec.presenter_name = user_info.get("name")
+            if not has_valid_email and user_info.get("email"):
+                spec.presenter_email = user_info.get("email")
+
+        # Se presenter_name é válido mas email ainda não, deriva automaticamente no padrão Geoambiente
+        if spec.presenter_name and (not spec.presenter_email or spec.presenter_email.strip().lower() in {"contato@geoambiente.com.br", "email@geoambiente.com.br"}):
+            from src.services.drive_service import format_geoambiente_email
+            spec.presenter_email = format_geoambiente_email(spec.presenter_name)
+
+        resolved_client = getattr(spec, "resolved_lead_name", None) or getattr(spec, "client_name", None) or getattr(spec, "client", None) or "Corporativo"
         file_name = f"{spec.title} - {resolved_client}"
-        logger.info(f"Agente 2 (Builder) iniciando construção de '{file_name}'...")
+        logger.info(f"Agente 2 (Builder) iniciando construção de '{file_name}' para {spec.resolved_presenter_name} ({spec.resolved_presenter_email})...")
 
         # 1. Clonar Template Matriz (ou criar nova se inacessível)
         presentation_id = self.drive_service.clone_matrix_template(title=file_name)

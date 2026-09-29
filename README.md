@@ -43,6 +43,10 @@ Solução corporativa oficial baseada em **Workflow Multi-Agente com Google Agen
 | **Modelo LLM Padrão** | **Gemini 3.7 Flash** (`gemini-3.7-flash`) | Raciocínio, estruturação e planejamento dos slides |
 | **Apresentação Matriz** | `19F33ff11h0p2NF6GEcYAPj3se0eGzWKwzir3szAZpiI` | Template oficial homologado Geoambiente clonado a cada execução |
 | **Destino do Arquivo** | `Meu Drive (root)` do Usuário Final | Criado com a credencial OAuth do próprio usuário do Gemini Enterprise |
+| **Slide 1 (Capa)** | Nome do Lead + Data de Envio | Conteúdo dinâmico mantendo Poppins Bold 36pt e formato institucional |
+| **Slides 2 a 5** | Preservados na sequência oficial | Agenda, Responsáveis pelo Projeto, Sumário Executivo e Divisor de Solução |
+| **Slide 6 em diante** | Início do conteúdo dinâmico | Cards estruturados gerados a partir do briefing do usuário |
+| **Último Slide** | Consultor & E-mail Corporativo | Personalizado para o apresentador (`nome.sobrenome@geoambiente.com.br`) |
 | **Fundo dos Slides** | `#F5F7FA` ou `#FFFFFF` | **Fundo escuro estritamente proibido** |
 | **Laranja Geoambiente** | `#F58120` | Pílulas/Tags de numeração, ênfases e destaques |
 | **Azul Google Cloud** | `#1A73E8` | Títulos dos cartões de conteúdo e ícones |
@@ -50,6 +54,15 @@ Solução corporativa oficial baseada em **Workflow Multi-Agente com Google Agen
 | **Texto Secundário** | `#5F6368` | Corpo dos tópicos e descrições |
 | **Tipografia** | **Poppins** (Títulos) / **Inter** (Corpo) | Padronização em todas as caixas de texto |
 | **Cards Pattern** | 2 a 4 cartões brancos com cantos arredondados | Estruturação visual modular de todos os slides de conteúdo |
+
+---
+
+## 📋 Pré-Requisitos e Fluxo de Geração
+
+Antes de criar a apresentação, o agente valida com o usuário três pré-requisitos essenciais:
+1. **Nome do Lead (Cliente / Empresa):** Obrigatório. Se não informado no briefing inicial, o agente solicita antes de chamar a ferramenta.
+2. **Consultor / Apresentador Responsável:** Obrigatório. O agente permite informar o nome de outro colega (executivo de contas) ou confirmar se a proposta será assinada pelo próprio usuário (resolvido automaticamente via Google Workspace OAuth). O e-mail corporativo é formatado automaticamente no padrão `nome.sobrenome@geoambiente.com.br`.
+3. **Data de Envio:** Opcional. Se omitida, assume a data atual.
 
 ---
 
@@ -221,3 +234,12 @@ Basta alterar a variável no seu arquivo `.env`:
 ```bash
 TEMPLATE_PRESENTATION_ID="NOVO_ID_AQUI"
 ```
+
+---
+
+## 🎨 Ícone Oficial no Gemini Enterprise
+
+O agente possui o logotipo oficial da Geoambiente configurado diretamente no registro do **Discovery Engine**:
+* **Arquivo Fonte:** [`logo.png`](logo.png) na raiz do projeto (PNG 300x300 institucional).
+* **Backup no Cloud Storage:** `gs://geo-gemini-artifacts-presales/logo.png`.
+* O ícone é renderizado nativamente no card do agente e nas conversas do Gemini Enterprise em substituição à inicial genérica.

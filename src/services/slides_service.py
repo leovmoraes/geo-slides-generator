@@ -61,10 +61,16 @@ class SlidesService:
                 welcome_slide_id = slides[1]["objectId"]
                 requests.extend(self._build_welcome_requests(welcome_slide_id, spec))
 
+            # Inserir conteúdo dinâmico a partir do slide 6 (índice 5), preservando os slides institucionais 2, 3, 4 e 5 na sequência
+            start_index = 5 if num_slides >= 6 else min(2, num_slides)
             for idx, slide_spec in enumerate(spec.slides):
-                insert_index = 2 + idx
+                insert_index = start_index + idx
                 slide_id = f"content_slide_{idx+1}"
                 requests.extend(self._build_content_slide_requests(slide_id, insert_index, slide_spec))
+
+            # Atualizar último slide da matriz (Encerramento / Contato institucional)
+            closing_slide_id = slides[-1]["objectId"]
+            requests.extend(self._build_closing_requests(closing_slide_id, spec))
         else:
             # Caso 2: Apresentação criada do zero (Construção completa de Capa, Boas-vindas e Conteúdo)
             cover_id = "slide_cover_custom"
@@ -108,8 +114,41 @@ class SlidesService:
         return url
 
     def _build_cover_requests(self, slide_id: str, spec: PresentationSpec) -> List[Dict[str, Any]]:
-        client_name = getattr(spec, "client_name", None) or getattr(spec, "client", "") or ""
+        from datetime import datetime
+        lead_name = getattr(spec, "lead_name", None) or getattr(spec, "client_name", None) or getattr(spec, "client", "") or "Cliente Corporativo"
+        send_date = getattr(spec, "send_date", None) or getattr(spec, "date", None) or datetime.now().strftime("%d/%m/%Y")
+        
         return [
+            # 1. Substituições oficiais da Matriz Homologada Geoambiente (Slide 0)
+            {
+                "replaceAllText": {
+                    "containsText": {"text": "Nome do Lead", "matchCase": False},
+                    "replaceText": lead_name,
+                    "pageObjectIds": [slide_id]
+                }
+            },
+            {
+                "replaceAllText": {
+                    "containsText": {"text": "[Data de Envio]", "matchCase": False},
+                    "replaceText": send_date,
+                    "pageObjectIds": [slide_id]
+                }
+            },
+            {
+                "replaceAllText": {
+                    "containsText": {"text": "Data de Envio", "matchCase": False},
+                    "replaceText": send_date,
+                    "pageObjectIds": [slide_id]
+                }
+            },
+            # 2. Fallbacks para tags legadas
+            {
+                "replaceAllText": {
+                    "containsText": {"text": "{{CLIENTE}}", "matchCase": False},
+                    "replaceText": lead_name,
+                    "pageObjectIds": [slide_id]
+                }
+            },
             {
                 "replaceAllText": {
                     "containsText": {"text": "{{TITULO}}", "matchCase": False},
@@ -123,11 +162,25 @@ class SlidesService:
                     "replaceText": spec.subtitle,
                     "pageObjectIds": [slide_id]
                 }
+            }
+        ]
+
+    def _build_closing_requests(self, slide_id: str, spec: PresentationSpec) -> List[Dict[str, Any]]:
+        """Substitui o Nome e E-mail do consultor no último slide da matriz."""
+        presenter_name = getattr(spec, "resolved_presenter_name", None) or getattr(spec, "presenter_name", None) or "Equipe Geoambiente"
+        presenter_email = getattr(spec, "resolved_presenter_email", None) or getattr(spec, "presenter_email", None) or "contato@geoambiente.com.br"
+        return [
+            {
+                "replaceAllText": {
+                    "containsText": {"text": "Nome Sobrenome", "matchCase": False},
+                    "replaceText": presenter_name,
+                    "pageObjectIds": [slide_id]
+                }
             },
             {
                 "replaceAllText": {
-                    "containsText": {"text": "{{CLIENTE}}", "matchCase": False},
-                    "replaceText": client_name,
+                    "containsText": {"text": "email@geoambiente.com.br", "matchCase": False},
+                    "replaceText": presenter_email,
                     "pageObjectIds": [slide_id]
                 }
             }

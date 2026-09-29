@@ -65,3 +65,63 @@ class DriveService:
                 logger.info(f"Permissão de acesso 'domain' ({role}) configurada para {file_id}")
             except Exception as err2:
                 logger.warning(f"Aviso ao ajustar permissão de compartilhamento: {err2}")
+
+    def get_user_info(self) -> dict:
+        """
+        Obtém o nome e e-mail do usuário autenticado no Workspace via Drive API.
+        Formata o nome a partir do displayName ou do padrão 'nome.sobrenome@'.
+        """
+        try:
+            about = self.client.about().get(fields="user").execute()
+            user = about.get("user", {})
+            display_name = user.get("displayName")
+            email = user.get("emailAddress", "")
+            
+            if not display_name and email and "@" in email:
+                user_part = email.split("@")[0]
+                display_name = " ".join(p.capitalize() for p in user_part.split("."))
+
+            if display_name and not email:
+                email = format_geoambiente_email(display_name)
+
+            logger.info(f"Identidade do usuário final detectada: {display_name} <{email}>")
+            return {
+                "name": display_name or "Equipe Geoambiente",
+                "email": email or "contato@geoambiente.com.br"
+            }
+        except Exception as e:
+            logger.warning(f"Aviso ao consultar dados do usuário no Drive API: {e}")
+            return {
+                "name": "Equipe Geoambiente",
+                "email": "contato@geoambiente.com.br"
+            }
+
+
+def format_geoambiente_email(name: str) -> str:
+    """
+    Formata o e-mail corporativo Geoambiente no padrão nome.sobrenome@geoambiente.com.br.
+    Remove acentos, caracteres especiais e palavras de ligação (de, da, do, das, dos, e).
+    Exemplos:
+        "Leonardo Moraes" -> "leonardo.moraes@geoambiente.com.br"
+        "Leonardo Vieira de Moraes" -> "leonardo.moraes@geoambiente.com.br"
+        "João da Silva" -> "joao.silva@geoambiente.com.br"
+    """
+    import unicodedata
+    import re
+
+    if not name:
+        return "contato@geoambiente.com.br"
+
+    if "@" in name:
+        return name.strip().lower()
+
+    normalized = unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode("ASCII").lower()
+    clean = re.sub(r"[^a-z\s]", "", normalized)
+    parts = [p for p in clean.split() if p not in {"de", "da", "do", "das", "dos", "e", "di"}]
+
+    if len(parts) >= 2:
+        return f"{parts[0]}.{parts[-1]}@geoambiente.com.br"
+    elif len(parts) == 1:
+        return f"{parts[0]}@geoambiente.com.br"
+    return "contato@geoambiente.com.br"
+

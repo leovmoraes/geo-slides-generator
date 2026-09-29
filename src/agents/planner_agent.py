@@ -44,15 +44,31 @@ class PlannerAgent:
             location=GCP_REGION
         ) if os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "true").lower() == "true" else genai.Client()
 
-    def plan_presentation(self, user_prompt: str) -> PresentationSpec:
+    def plan_presentation(
+        self, 
+        user_prompt: str, 
+        lead_name: Optional[str] = None, 
+        send_date: Optional[str] = None,
+        presenter_name: Optional[str] = None,
+        presenter_email: Optional[str] = None
+    ) -> PresentationSpec:
         """
         Interpreta o briefing do usuário e gera a especificação completa da apresentação.
         """
         logger.info(f"Agente 1 (Planner) gerando conteúdo usando modelo '{self.model_name}'...")
+        prompt_with_context = user_prompt
+        if lead_name:
+            prompt_with_context += f"\n[INFORMAÇÃO MANDATÓRIA]: O Nome do Lead / Cliente corporativo é: '{lead_name}'."
+        if send_date:
+            prompt_with_context += f"\n[INFORMAÇÃO MANDATÓRIA]: A Data de Envio da proposta é: '{send_date}'."
+        if presenter_name:
+            prompt_with_context += f"\n[INFORMAÇÃO MANDATÓRIA]: O Consultor/Apresentador responsável é: '{presenter_name}'."
+        if presenter_email:
+            prompt_with_context += f"\n[INFORMAÇÃO MANDATÓRIA]: O E-mail do Consultor/Apresentador é: '{presenter_email}'."
 
         response = self.client.models.generate_content(
             model=self.model_name,
-            contents=user_prompt,
+            contents=prompt_with_context,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_INSTRUCTION,
                 response_mime_type="application/json",
@@ -67,5 +83,31 @@ class PlannerAgent:
         # Converte e valida estritamente com Pydantic
         spec_data = json.loads(raw_text)
         spec = PresentationSpec.model_validate(spec_data)
-        logger.info(f"Especificação validada: '{spec.title}' com {len(spec.slides)} slides de conteúdo.")
+        if lead_name:
+            spec.lead_name = lead_name
+            spec.client_name = lead_name
+            spec.client = lead_name
+        if send_date:
+            spec.send_date = send_date
+            spec.date = send_date
+
+        generic_names = {
+            "equipe comercial geoambiente", 
+            "equipe geoambiente", 
+            "geoambiente cloud solutions", 
+            "equipe especialista geoambiente",
+            "especialista geoambiente"
+        }
+
+        if presenter_name:
+            spec.presenter_name = presenter_name
+        elif spec.presenter_name and spec.presenter_name.strip().lower() in generic_names:
+            spec.presenter_name = None
+
+        if presenter_email:
+            spec.presenter_email = presenter_email
+        elif spec.presenter_email and spec.presenter_email.strip().lower() in {"contato@geoambiente.com.br", "email@geoambiente.com.br"}:
+            spec.presenter_email = None
+
+        logger.info(f"Especificação validada: '{spec.title}' para o lead '{spec.resolved_lead_name}' na data '{spec.resolved_send_date}'. Apresentador: '{spec.resolved_presenter_name}' ({spec.resolved_presenter_email})")
         return spec

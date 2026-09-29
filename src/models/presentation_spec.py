@@ -1,4 +1,4 @@
-﻿"""
+"""
 Modelos Pydantic para Estruturação Estrita das Apresentações Geoambiente
 """
 
@@ -88,6 +88,22 @@ class PresentationSpec(BaseModel):
         default=None,
         description="Data da apresentação no formato DD/MM/AAAA"
     )
+    lead_name: Optional[str] = Field(
+        default=None,
+        description="Nome do Lead / Cliente corporativo para a Capa oficial"
+    )
+    send_date: Optional[str] = Field(
+        default=None,
+        description="Data de Envio da proposta no formato DD/MM/AAAA ou mês/ano"
+    )
+    presenter_name: Optional[str] = Field(
+        default=None,
+        description="Nome do consultor / apresentador corporativo Geoambiente"
+    )
+    presenter_email: Optional[str] = Field(
+        default=None,
+        description="E-mail corporativo do consultor / apresentador Geoambiente"
+    )
     welcome_slide: Optional[SlideSpec] = Field(
         default=None,
         description="Slide opcional de Boas-vindas / Contexto e Agenda"
@@ -97,3 +113,36 @@ class PresentationSpec(BaseModel):
         min_length=1,
         description="Lista de slides intermediários estruturados em cartões"
     )
+
+    @property
+    def resolved_lead_name(self) -> str:
+        return self.lead_name or self.client_name or self.client or "Cliente Corporativo"
+
+    @property
+    def resolved_send_date(self) -> str:
+        from datetime import datetime
+        return self.send_date or self.date or datetime.now().strftime("%d/%m/%Y")
+
+    @property
+    def resolved_presenter_name(self) -> str:
+        generic = {
+            "equipe comercial geoambiente", 
+            "equipe geoambiente", 
+            "geoambiente cloud solutions", 
+            "equipe especialista geoambiente",
+            "especialista geoambiente"
+        }
+        if self.presenter_name and self.presenter_name.strip().lower() not in generic:
+            return self.presenter_name.strip()
+        return "Equipe Geoambiente"
+
+    @property
+    def resolved_presenter_email(self) -> str:
+        generic = {"contato@geoambiente.com.br", "email@geoambiente.com.br"}
+        if self.presenter_email and self.presenter_email.strip().lower() not in generic:
+            return self.presenter_email.strip().lower()
+        if self.presenter_name and self.resolved_presenter_name != "Equipe Geoambiente":
+            from src.services.drive_service import format_geoambiente_email
+            return format_geoambiente_email(self.resolved_presenter_name)
+        return "contato@geoambiente.com.br"
+
