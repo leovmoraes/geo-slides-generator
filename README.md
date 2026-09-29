@@ -79,12 +79,12 @@ O custo de geração é baseado na tabela de consumo de tokens da API **Gemini 3
 * **Entrada (Input):** ~1.000 a 1.500 tokens (Briefing do usuário, contexto do lead, persona e validação do schema Pydantic).
 * **Saída (Output):** ~1.500 a 2.500 tokens (Estruturação completa em JSON de 4 a 6 slides de conteúdo com cards, tópicos e pilares).
 
-### 3. Custo por Apresentação e por Slide
+### 3. Custo por Apresentação e Escala de Produção
 
-| Período | Custo Total por Apresentação (~18 slides) | Custo por Slide Dinâmico Gerado (~5 slides) | Custo Médio por Slide da Apresentação Completa |
-| :--- | :--- | :--- | :--- |
-| **Até 31/12/2026** *(Tarifa Atual)* | **~\$0,0084** *(< 1 centavo / ~R\$ 0,04)* | **~\$0,0017** *(fração de centavo / ~R\$ 0,009)* | **~\$0,0004** *(~R\$ 0,002)* |
-| **A partir de 01/01/2027** *(Tabela Cheia)* | **~\$0,0168** *(~1,7 centavos / ~R\$ 0,09)* | **~\$0,0034** *(~R\$ 0,018)* | **~\$0,0009** *(~R\$ 0,005)* |
+| Período | Custo por Apresentação (~18 slides) | Custo por Slide Dinâmico | **Estimativa para 1.000 Slides Dinâmicos (~200 decks)** | Estimativa para 100 Apresentações Completas (~1.800 slides) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Até 31/12/2026** *(Tarifa Vigente)* | **~\$0.0084** | **~\$0.0017** | **~\$1.70** | **~\$0.84** |
+| **A partir de 01/01/2027** *(Tabela Regular)* | **~\$0.0168** | **~\$0.0034** | **~\$3.40** | **~\$1.68** |
 
 > [!TIP]
 > **APIs do Google Workspace Gratuitas:** Todas as chamadas de clonagem, estruturação e compartilhamento via Google Slides API e Google Drive API não possuem custo por chamada (inclusas nas cotas do Google Workspace). O container no Agent Runtime escala para zero quando inativo, sendo tarifado apenas pelos segundos de execução do request (~15-20s).
