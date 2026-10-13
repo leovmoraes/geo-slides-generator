@@ -1,6 +1,6 @@
 # Geoambiente & Google Cloud - Slide Master Generator (ADK Multi-Agent Workflow)
 
-Solução corporativa oficial baseada em **Workflow Multi-Agente com Google Agent Development Kit (ADK / Python)** e **Vertex AI Agent Runtime (Reasoning Engine)**, utilizando o modelo **Gemini 3.7 Flash**. Especialista na criação e formatação automatizada de apresentações corporativas no Google Slides diretamente pelo **Gemini Enterprise**, seguindo rigorosamente a identidade visual da **Geoambiente** e a apresentação matriz homologada.
+Solução corporativa oficial baseada em **Workflow Multi-Agente com Google Agent Development Kit (ADK / Python)** e **Vertex AI Agent Runtime (Reasoning Engine)**, utilizando o modelo **Gemini 3.5 Flash**. Especialista na criação e formatação automatizada de apresentações corporativas no Google Slides diretamente pelo **Gemini Enterprise**, seguindo rigorosamente a identidade visual da **Geoambiente** e a apresentação matriz homologada.
 
 ---
 
@@ -19,7 +19,7 @@ Solução corporativa oficial baseada em **Workflow Multi-Agente com Google Agen
 │                                                                                        │
 │  ┌────────────────────────────────────────┐    ┌────────────────────────────────────┐  │
 │  │ 🧠 AGENTE 1: CONTENT & DESIGN PLANNER  │    │ 🔨 AGENTE 2: SLIDE MASTER BUILDER  │  │
-│  │ (LLM: Gemini 3.7 Flash)                │    │ (Motor Determinístico de Slides)   │  │
+│  │ (LLM: Gemini 3.5 Flash)                │    │ (Motor Determinístico de Slides)   │  │
 │  │                                        │    │                                    │  │
 │  │ • Briefing livre do usuário final      │───▶│ • Clona a matriz oficial homologada│  │
 │  │ • Cria narrativa, títulos e pilares    │    │   (ID: 19F33ff11h0p2NF6...)        │  │
@@ -40,7 +40,7 @@ Solução corporativa oficial baseada em **Workflow Multi-Agente com Google Agen
 
 | Elemento | Especificação | Aplicação |
 | :--- | :--- | :--- |
-| **Modelo LLM Padrão** | **Gemini 3.7 Flash** (`gemini-3.7-flash`) | Raciocínio, estruturação e planejamento dos slides |
+| **Modelo LLM Padrão** | **Gemini 3.5 Flash** (`gemini-3.5-flash`) | Raciocínio, estruturação e planejamento dos slides |
 | **Apresentação Matriz** | `19F33ff11h0p2NF6GEcYAPj3se0eGzWKwzir3szAZpiI` | Template oficial homologado Geoambiente clonado a cada execução |
 | **Destino do Arquivo** | `Meu Drive (root)` do Usuário Final | Criado com a credencial OAuth do próprio usuário do Gemini Enterprise |
 | **Slide 1 (Capa)** | Nome do Lead + Data de Envio | Conteúdo dinâmico mantendo Poppins Bold 36pt e formato institucional |
@@ -66,9 +66,9 @@ Antes de criar a apresentação, o agente valida com o usuário três pré-requi
 
 ---
 
-## 💰 Estimativa de Investimento por Slide e Apresentação (Gemini 3.7 Flash)
+## 💰 Estimativa de Investimento por Slide e Apresentação (Gemini 3.5 Flash)
 
-O custo de geração é baseado na tabela de consumo de tokens da API **Gemini 3.7 Flash Standard** no Vertex AI:
+O custo de geração é baseado na tabela de consumo de tokens da API **Gemini 3.5 Flash Standard** no Vertex AI:
 
 ### 1. Tabela de Precificação do Modelo (Google Cloud)
 * **Input (Tokens de Entrada):** `\$0.75` por 1 milhão de tokens
@@ -107,7 +107,7 @@ slides-agent/
 │   ├── models/
 │   │   └── presentation_spec.py   # Contrato Pydantic (CardSpec, SlideSpec, PresentationSpec)
 │   ├── agents/
-│   │   ├── planner_agent.py       # Agente 1: Content & Design Planner (Gemini 3.7 Flash)
+│   │   ├── planner_agent.py       # Agente 1: Content & Design Planner (Gemini 3.5 Flash)
 │   │   └── builder_agent.py       # Agente 2: Slide Master Builder (Automação de Slides)
 │   ├── services/
 │   │   ├── auth_service.py        # Autenticação (OAuth delegado do usuário, ADC e token local)
@@ -264,7 +264,7 @@ TEMPLATE_PRESENTATION_ID="NOVO_ID_AQUI"
 
 ## 🤖 Como Atualizar a Versão do Modelo Gemini (ex: Gemini 4.0, 4.5 Flash)
 
-Os modelos de IA do ecossistema Google Cloud evoluem periodicamente. O agente foi arquitetado para permitir a troca do modelo (ex: de `gemini-3.7-flash` para `gemini-4.0-flash` ou `gemini-4.5-flash`) de forma desacoplada através da variável de ambiente `GEMINI_MODEL`.
+Os modelos de IA do ecossistema Google Cloud evoluem periodicamente. O agente foi arquitetado para permitir a troca do modelo (ex: de `gemini-3.5-flash` para `gemini-4.0-flash` ou `gemini-4.5-flash`) de forma desacoplada através da variável de ambiente `GEMINI_MODEL`.
 
 ### 1. Atualização Imediata em Produção (Sem mexer em código):
 Execute o deploy com o parâmetro `--update-env-vars`:

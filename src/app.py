@@ -1,4 +1,4 @@
-﻿"""
+"""
 Definição oficial do Agente usando o Google Agent Development Kit (ADK).
 Compatível 100% nativo com Gemini Enterprise, Agent Platform e Agent Runtime.
 """
@@ -6,6 +6,7 @@ Compatível 100% nativo com Gemini Enterprise, Agent Platform e Agent Runtime.
 import logging
 from google.adk.agents import Agent
 from google.adk.tools import FunctionTool
+from src.config import DEFAULT_GEMINI_MODEL
 from src.workflow.orchestrator import SlideMasterWorkflow
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ def create_root_agent() -> Agent:
     """Cria e retorna a instância oficial do Agente ADK."""
     return Agent(
         name="Gerador_Apresentacoes_Geoambiente",
-        model="gemini-3.7-flash",
+        model=DEFAULT_GEMINI_MODEL,
         description="Agente corporativo especialista na criação e automação de apresentações e propostas comerciais no Google Slides da Geoambiente e Google Cloud.",
         instruction="""Você é o Gerador de Apresentações Corporativas da Geoambiente.
 Sua missão é criar apresentações e propostas comerciais executivas no padrão visual oficial Geoambiente & Google Cloud.

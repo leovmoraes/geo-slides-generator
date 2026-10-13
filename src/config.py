@@ -1,4 +1,4 @@
-﻿"""
+"""
 Configurações e Design System Corporativo Geoambiente & Google Cloud
 """
 
@@ -7,12 +7,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# GCP & Workspace Settings (Gemini 3.7 Flash utiliza location "global")
+# GCP & Workspace Settings (Gemini 3.5 Flash utiliza location "global")
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "geo-gemini-enterprise")
 GCP_REGION = os.getenv("GCP_REGION", "global")
 
 # Modelo Gemini de Alta Performance
-DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
+DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 
 # Template Matrix Oficial Homologado no Google Slides
 TEMPLATE_PRESENTATION_ID = os.getenv(

@@ -14,7 +14,7 @@ from src.services.auth_service import get_google_credentials
 DEPLOY_LOCATION = "us-central1"
 STAGING_BUCKET = "gs://geo-gemini-artifacts-presales"
 DISPLAY_NAME = "Gerador de Apresentações Geoambiente"
-DESCRIPTION = "Agente corporativo oficial para criação automática de apresentações no Google Slides via Gemini 3.7 Flash e Google ADK."
+DESCRIPTION = "Agente corporativo oficial para criação automática de apresentações no Google Slides via Gemini 3.5 Flash e Google ADK."
 
 # Dependências completas para o Agent Runtime do Vertex AI
 REQUIREMENTS = [
